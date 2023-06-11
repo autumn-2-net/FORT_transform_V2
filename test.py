@@ -3,12 +3,12 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-query = torch.rand(4, 8, 8, 64, dtype=torch.float16, device="cuda")
+query = torch.rand(4, 8, 4, 64, dtype=torch.float16, device="cuda")
 key = torch.ones(4, 8, 4, 64, dtype=torch.float16, device="cuda")
 value = torch.rand(4, 8, 4, 64, dtype=torch.float16, device="cuda")
 print(value.size())
 # with torch.backends.cuda.sdp_kernel(enable_math=False):
-attn=torch.tensor([[True, True, True,False],[True, True, True,False],[True, True, True,False],[False, False, False,False]]).unsqueeze(1).unsqueeze(1)
+attn=torch.tensor([[True, False, False,False],[True, False, False,False],[False, False, False,False],[False, False, False,False]]).unsqueeze(1).unsqueeze(1)
 atn =~ attn
 d =(query@key.transpose(-2, -1)).cpu().masked_fill(~ attn, -float('inf')).numpy()
 a =F.scaled_dot_product_attention(query,key,value,attn_mask= attn.cuda(), )

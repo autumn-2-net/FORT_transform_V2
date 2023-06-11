@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 
 class ATT_encode(nn.Module):
-    def __init__(self, lays, dim, heads, inner_dim, out_dim, mlpdropout=0.0, attdropout=0.0, pox=4, att_type=None,
+    def __init__(self, lays,bhlay,imglay, dim, heads, inner_dim, out_dim, mlpdropout=0.0, attdropout=0.0, pox=4, att_type=None,
                  jhhc='GELU'):
         super().__init__()
         self.sfa_bh = self_attention(lays, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
@@ -89,7 +89,7 @@ class EMBDim(nn.Module):
         if self.posTYPE == 'REL':
             x=self.RELposition(x)
             if mask is not None:
-                x=x.masked_fill(mask==0,0)
+                x=x.masked_fill(mask.unsqueeze(2)==0,0)
             return x
         elif self.posTYPE == 'Learn':
 
@@ -105,10 +105,10 @@ class EMBDim(nn.Module):
     def forward(self,x,t,mask=None):
         if t==1:
             bhe=self.Wembedding(x)
-            bhe=bhe+self.type_emb(torch.tensor([1])).unsqueeze(0).unsqueeze(0)
+            bhe=bhe+self.type_emb(torch.tensor([1])).unsqueeze(0)
             return self.get_post(bhe,mask=mask)
         if t == 0:
-            img=x+self.type_emb(torch.tensor([0])).unsqueeze(0).unsqueeze(0)
+            img=x+self.type_emb(torch.tensor([0])).unsqueeze(0)
             return self.get_post(img, mask=mask)
 
 

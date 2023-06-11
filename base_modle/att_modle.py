@@ -35,7 +35,7 @@ class attention(nn.Module):
 
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), (q, k, v))
         if attn_mask is not None:
-            attn_mask = attn_mask.unsqueeze(1).unsqueeze(1)
+            attn_mask = attn_mask.unsqueeze(1).unsqueeze(1)==1
 
         with torch.backends.cuda.sdp_kernel(**self.att_type):
             x = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, )
@@ -100,10 +100,10 @@ class cross_att_lay(nn.Module):
         self.ln_img1 = nn.LayerNorm(dim, eps=1e-12)
 
     def forward(self, x_img, y_bh, bh_attention_mask=None, img_attention_mask=None):
-        y_bhs = self.ln_bh1(self.attention_bh(x_img, x_img, y_bh, bh_attention_mask) + y_bh)
+        y_bhs = self.ln_bh1(self.attention_bh(x_img, x_img, y_bh, img_attention_mask) + y_bh)
         y_bhs = self.ln_bh2(self.Mlp_bh(y_bhs) + y_bhs)
 
-        x_img = self.ln_bh1(self.attention_bh(y_bh, y_bh, x_img, img_attention_mask) + x_img)
+        x_img = self.ln_bh1(self.attention_bh(y_bh, y_bh, x_img, bh_attention_mask) + x_img)
         x_img = self.ln_bh2(self.Mlp_bh(x_img) + x_img)
 
         return x_img, y_bhs,
