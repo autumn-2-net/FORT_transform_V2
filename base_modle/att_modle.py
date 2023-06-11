@@ -138,8 +138,8 @@ class coross_attention(nn.Module):
 
     def forward(self, x_img, y_bh, bh_attention_mask=None, img_attention_mask=None):
         for lay in self.lix:
-            y_bh, x_img=lay(x_img, y_bh, bh_attention_mask, img_attention_mask)
-        return y_bh,x_img
+             x_img,y_bh,=lay(x_img, y_bh, bh_attention_mask, img_attention_mask)
+        return x_img,y_bh,
 
 class self_attention(nn.Module):
     def __init__(self,lays, dim, heads, inner_dim, mlpdropout=0.0, attdropout=0.0,pox=4, att_type=None,jhhc='GELU'):
