@@ -94,7 +94,7 @@ class EMBDim(nn.Module):
         elif self.posTYPE == 'Learn':
 
             L=x.size()[2]
-            p=torch.tensor([i for i in range(L)]).unsqueeze(0).unsqueeze(0)
+            p=torch.tensor([i for i in range(L)]).unsqueeze(0).unsqueeze(0).to(x)
             pos=self.position(p)
             if mask is not None:
                 out=(x+pos).masked_fill(mask==0,0)
@@ -105,10 +105,10 @@ class EMBDim(nn.Module):
     def forward(self,x,t,mask=None):
         if t==1:
             bhe=self.Wembedding(x)
-            bhe=bhe+self.type_emb(torch.tensor([1])).unsqueeze(0)
+            bhe=bhe+self.type_emb(torch.tensor([1], dtype=torch.int32,device=x.device)).unsqueeze(0).to(x)
             return self.get_post(bhe,mask=mask)
         if t == 0:
-            img=x+self.type_emb(torch.tensor([0])).unsqueeze(0)
+            img=x+self.type_emb(torch.tensor([0], dtype=torch.int32,device=x.device)).unsqueeze(0).to(x)
             return self.get_post(img, mask=mask)
 
 

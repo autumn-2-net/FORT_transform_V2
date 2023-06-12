@@ -1,10 +1,13 @@
 import torch
 import torch.nn as nn
-import pytorch_lightning as pt
+# import pytorch_lightning as pt
+import lightning as pt
 from einops import rearrange
+from lightning import Trainer
+from torch.utils.data import DataLoader
 
 from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle
-
+from base_modle.dataset import dastset
 
 
 class GLU(nn.Module):
@@ -58,12 +61,47 @@ class FORT_encode(pt.LightningModule):
         img =self.decode(img_feature)
         return img,bh
 
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.002)
 
+        return {"optimizer": optimizer,
+                # "lr_scheduler": lt
+                }
+
+
+    def training_step(self, batch, batch_idx):
+        img_tensor, tocken, padmask, masktocken=batch
+
+        img,bh=self.forward(img_tensor,masktocken,bhmask=padmask)
+
+        loss_img=nn.SmoothL1Loss()(img_tensor,img)
+
+        # bh = rearrange(bh, 'b n s -> b s n ', )
+        # bhloss=nn.CrossEntropyLoss()(bh,tocken.long())
+        bhloss=0
+
+        return (loss_img+bhloss)/2
 
 
 
 
 if __name__=='__main__':
+
+    modss=FORT_encode(ATTlays=5,bhlay=6,imglay=4,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.5,attdropout=0.05)
+    aaaa = dastset('映射.json', 'fix1.json', './i')
+
+    from pytorch_lightning import loggers as pl_loggers
+
+    tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"lagegeFDbignet_1000")
+
+
+    trainer = Trainer(accelerator='gpu',gradient_clip_val=0.1,logger=tensorboard,max_epochs=400
+                      #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
+                      )
+    # trainer.save_checkpoint('test.pyt')
+    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=6
+                                                   #,num_workers=1
+                                                   ))
 
 
 

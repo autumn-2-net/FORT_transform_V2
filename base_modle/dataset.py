@@ -53,8 +53,8 @@ class dastset(Dataset):
             maskb = [0 for _ in range(self.max_len - w_len)]
             mask = maska + maskb
             tk=tk+maskb
-            self.cpnt[j]=[tk,mask]
-
+            self.cpnt[j]=[tk,mask,w_len]
+        lcslist=[]
         listss=[]
         inxlen=[]
         axc=0
@@ -63,9 +63,16 @@ class dastset(Dataset):
             ppp=self.get_mask_and_path(i)
             ctx=len(ppp)
             axc=axc+ctx
-            listss.append([ppp])
+            lcslist=lcslist+ppp
+
+            # listss.append(ppp)
+
             inxlen.append(ctx)
+
             avxl.append(axc)
+
+        self.lcslist=lcslist
+
         self.avxl=avxl
         self.inxlen = inxlen
         self.listss=listss
@@ -83,6 +90,7 @@ class dastset(Dataset):
 
     def get_by_idx(self,idx):
 
+        exid=0
         il=0
         n=0
         for i in self.avxl:
@@ -93,6 +101,41 @@ class dastset(Dataset):
             n=n+1
             il=i
         return n,exid
+
+    def __len__(self):
+        return len(self.lcslist)
+
+    def __getitem__(self ,index):
+
+        imgx=self.lcslist[index]
+        tock,img_path=imgx[0],imgx[1]
+        tocken,mask,w_len=self.cpnt[tock][0],self.cpnt[tock][1],self.cpnt[tock][2]
+
+        maskf = w_len // 5 + 1
+        masktocken=tocken.copy()
+        for i in range(maskf):
+            mxk=random.randint(0,w_len-1)
+            masktocken[mxk]=43
+
+
+        tocken=torch.tensor(tocken,dtype=torch.int32)
+        padmask = torch.tensor(mask, dtype=torch.int32)
+        masktocken = torch.tensor(masktocken, dtype=torch.int32)
+        imgss = Image.open(img_path)
+
+        transform1 = transforms.Compose([
+            transforms.ToTensor(),  # range [0, 255] -> [0.0,1.0]
+        ]
+        )
+        img_tensor = transform1(imgss)
+
+
+
+
+
+
+
+        return img_tensor,tocken,padmask,masktocken
 
 
 
