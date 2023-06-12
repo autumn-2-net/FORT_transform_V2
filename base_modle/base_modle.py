@@ -15,18 +15,22 @@ class ATT_encode(nn.Module):
     def __init__(self, lays,bhlay,imglay, dim, heads, inner_dim, out_dim, mlpdropout=0.0, attdropout=0.0, pox=4, att_type=None,
                  jhhc='GELU'):
         super().__init__()
-        self.sfa_bh = self_attention(lays, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
-        self.sfa_img = self_attention(lays, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
+        self.sfa_bh = self_attention(bhlay, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
+        self.sfa_img = self_attention(imglay, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
         self.croa = coross_attention(lays, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
 
-        self.bh_out = nn.Linear(dim, out_dim)
+        self.bh_out1 = nn.Linear(dim, 4*dim)
+        self.bh_out2 = nn.Linear(dim*2, out_dim)
+        self.avx=GLU(2)
 
     def forward(self, x_img, y_bh, bh_attention_mask=None, img_attention_mask=None):
         e_img = self.sfa_img(x_img, img_attention_mask)
         e_bh = self.sfa_bh(y_bh, bh_attention_mask)
 
         img, bh = self.croa(e_img, e_bh, bh_attention_mask, img_attention_mask)
-        return img, self.bh_out(bh)
+        acsfd=self.avx(self.bh_out1(bh))
+
+        return img, self.bh_out2(acsfd)
 
 class res_block(nn.Module):
     def __init__(self,covsiz,chanal,stride,padding=0):

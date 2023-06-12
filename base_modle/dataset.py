@@ -113,7 +113,7 @@ class dastset(Dataset):
         tock,img_path=imgx[0],imgx[1]
         tocken,mask,w_len=self.cpnt[tock][0],self.cpnt[tock][1],self.cpnt[tock][2]
 
-        maskf = w_len // 5 + 1
+        maskf = w_len // 2
         masktocken=tocken.copy()
         for i in range(maskf):
             mxk=random.randint(0,w_len-1)
@@ -220,9 +220,10 @@ class Fdastset(Dataset):
             path=self.data_path+'/'+t_path+'/'+i
             w=i.replace('.png','').strip()
 
-            with open(path,'rb') as f:
-                imgss=f.read()
-            l.append([w,imgss])
+            im=Image.open(path)
+            img = np.array(im)
+            l.append([w,img])
+            im.close()
 
         return l
 
@@ -259,7 +260,7 @@ class Fdastset(Dataset):
         tocken=torch.tensor(tocken,dtype=torch.int32)
         padmask = torch.tensor(mask, dtype=torch.int32)
         masktocken = torch.tensor(masktocken, dtype=torch.int32)
-        imgss = Image.open(BytesIO(img_path))
+        imgss = img_path
 
 
         transform1 = transforms.Compose([

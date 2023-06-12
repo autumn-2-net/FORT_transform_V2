@@ -4,12 +4,16 @@ import torch.nn as nn
 import lightning as pt
 from einops import rearrange
 from lightning import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle
 from base_modle.dataset import dastset,Fdastset
 from matplotlib import pyplot as plt
+
+from base_modle.scheduler import WarmupLR
+
 
 class GLU(nn.Module):
     def __init__(self, dim):
@@ -65,10 +69,18 @@ class FORT_encode(pt.LightningModule):
         return img,bh
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.00001)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.0001)
+        lt = {
+            "scheduler": WarmupLR(optimizer, 25000, 5e-5),  # 调度器
+            "interval": 'step',  # 调度的单位，epoch或step
+
+            "reduce_on_plateau": False,  # ReduceLROnPlateau
+            "monitor": "val_loss",  # ReduceLROnPlateau的监控指标
+            "strict": False  # 如果没有monitor，是否中断训练
+        }
 
         return {"optimizer": optimizer,
-                # "lr_scheduler": lt
+                "lr_scheduler": lt
                 }
 
 
@@ -84,8 +96,8 @@ class FORT_encode(pt.LightningModule):
         bhloss=nn.CrossEntropyLoss(ignore_index=0)(bhs,tocken.long())
         # bhloss=0
 
-        if batch_idx%10==0:
-            self.wwww(img,img_tensor,loss_img,bhloss,bh,tocken,masktocken)
+        if batch_idx%50==0:
+            self.wwww(batch_idx,img,img_tensor,loss_img,bhloss,bh,tocken,masktocken)
 
 
         return (loss_img+bhloss)/2
@@ -95,7 +107,7 @@ class FORT_encode(pt.LightningModule):
         # print(optimizer.state_dict()['param_groups'][0]['lr'],self.global_step)
         self.lrc = optimizer.state_dict()['param_groups'][0]['lr']
 
-    def wwww(self,img,img2,loss1,loss2,bh,tocken,masktocken):
+    def wwww(self,batch_idx,img,img2,loss1,loss2,bh,tocken,masktocken):
 
 
         step=self.global_step
@@ -109,17 +121,15 @@ class FORT_encode(pt.LightningModule):
         writer.add_scalar('train/loss2', loss2, step)
         writer.add_scalar('train/grad_norm', self.grad_norm, step)
         writer.add_scalar('train/lr', self.lrc, step)
-        writer.add_images('train/img',img.float(), step)
-        writer.add_images('train/gtimg', img2.float(), step)
+        if batch_idx % 200 == 0:
+            writer.add_images('train/img',img.float(), step)
+            writer.add_images('train/gtimg', img2.float(), step)
 
-
-
-
-
-        GT,pre,mask = self.mcpx(bh,tocken,masktocken)
-        writer.add_figure('M/GT', GT, step)
-        writer.add_figure('M/pre', pre, step)
-        writer.add_figure('M/mask', mask, step)
+        if batch_idx % 100 == 0:
+            GT,pre,mask = self.mcpx(bh,tocken,masktocken)
+            writer.add_figure('M/GT', GT, step)
+            writer.add_figure('M/pre', pre, step)
+            writer.add_figure('M/mask', mask, step)
         writer.flush()
 
     def mcpx(self,bh:torch.Tensor,tocken,masktocken):
@@ -144,6 +154,8 @@ class FORT_encode(pt.LightningModule):
         for i, idk in enumerate(tk2):
             ddd2[i][idk] = 1
         ddd2 = ddd2.cpu().numpy()
+
+
 
 
 
@@ -194,20 +206,31 @@ class FORT_encode(pt.LightningModule):
 
 if __name__=='__main__':
     writer = SummaryWriter("./mdsr_1000s/", )
-    modss=FORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.5,attdropout=0.05)
+    modss=FORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = dastset('映射.json', 'fix1.json', './i')
     from pytorch_lightning import loggers as pl_loggers
 
-    tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"lagegeFDbignet_1000")
+    tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"FORT_modle")
+    checkpoint_callback = ModelCheckpoint(
 
+        # monitor = 'val/loss',
 
-    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,#precision='bf16'
+        dirpath='./mdscp',
+
+        filename='sample-mnist-epoch{epoch:02d}-{epoch}-{step}',
+
+        auto_insert_metric_name=False#, every_n_epochs=20
+        , save_top_k=-1,every_n_train_steps=15000
+
+    )
+
+    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,callbacks=[checkpoint_callback],#precision='bf16'
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
-    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=8,shuffle=True
-                                                   ,num_workers=0
+    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=4,shuffle=True
+                                                   ,num_workers=4,prefetch_factor =16,pin_memory=True,
                                                    ))
 
 
