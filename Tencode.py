@@ -18,7 +18,7 @@ class GLU(nn.Module):
 
 
 class FORT_encode(pt.LightningModule):
-    def __init__(self, ATTlays, bhlay, imglay, dim, heads, inner_dim, out_dim, wnum=48, postlen=65, embt='REL',
+    def __init__(self, ATTlays, bhlay, imglay, dim, heads, inner_dim, out_dim, max_tochen_len=48, postlen=65, embt='REL',
                  pos_emb_drop=0.0, mlpdropout=0.0, attdropout=0.0, pox=4, att_type=None,
                  jhhc='GELU',rea_lays=4):
         super().__init__()
@@ -26,7 +26,7 @@ class FORT_encode(pt.LightningModule):
                               att_type,
                               jhhc)
 
-        self.EMA = EMBDim(dim, wnum=wnum, postlen=postlen, embt=embt, drop=pos_emb_drop)
+        self.EMA = EMBDim(dim, max_tochen_len=max_tochen_len, postlen=postlen, embt=embt, drop=pos_emb_drop)
         self.resc=res_modle(rea_lays,512)
         self.in_cov=cov_encode()
 
@@ -57,6 +57,9 @@ class FORT_encode(pt.LightningModule):
 
         img =self.decode(img_feature)
         return img,bh
+
+
+
 
 
 

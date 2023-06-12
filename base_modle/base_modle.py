@@ -77,12 +77,12 @@ class cov_encode(nn.Module):
         return self.cov2(a)
     
 class EMBDim(nn.Module):
-    def __init__(self,dim,wnum=48,postlen=65,embt='REL',drop=0.0):
+    def __init__(self,dim,max_tochen_len=48,postlen=65,embt='REL',drop=0.0):
         super().__init__()
         self.type_emb=nn.Embedding(2,dim) #0 img 1bh
         self.posTYPE=embt
         self.position = nn.Embedding(num_embeddings=postlen, embedding_dim=dim)
-        self.Wembedding = nn.Embedding(num_embeddings=wnum, embedding_dim=dim, padding_idx=0)  # 词嵌入
+        self.Wembedding = nn.Embedding(num_embeddings=max_tochen_len, embedding_dim=dim, padding_idx=0)  # 词嵌入
 
         self.RELposition=RelPositionalEncoding(dim,drop)
     def get_post(self,x,mask=None):
