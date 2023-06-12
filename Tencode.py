@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle
-from base_modle.dataset import dastset
+from base_modle.dataset import dastset,Fdastset
 from matplotlib import pyplot as plt
 
 class GLU(nn.Module):
@@ -65,7 +65,7 @@ class FORT_encode(pt.LightningModule):
         return img,bh
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.00005)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.00001)
 
         return {"optimizer": optimizer,
                 # "lr_scheduler": lt
@@ -85,7 +85,7 @@ class FORT_encode(pt.LightningModule):
         # bhloss=0
 
         if batch_idx%10==0:
-            self.wwww(img,img_tensor,loss_img,bhloss,bh,tocken)
+            self.wwww(img,img_tensor,loss_img,bhloss,bh,tocken,masktocken)
 
 
         return (loss_img+bhloss)/2
@@ -95,7 +95,7 @@ class FORT_encode(pt.LightningModule):
         # print(optimizer.state_dict()['param_groups'][0]['lr'],self.global_step)
         self.lrc = optimizer.state_dict()['param_groups'][0]['lr']
 
-    def wwww(self,img,img2,loss1,loss2,bh,tocken):
+    def wwww(self,img,img2,loss1,loss2,bh,tocken,masktocken):
 
 
         step=self.global_step
@@ -116,12 +116,13 @@ class FORT_encode(pt.LightningModule):
 
 
 
-        fff,ff = self.mcpx(bh,tocken)
-        writer.add_figure('train/ggg', fff, step)
-        writer.add_figure('train/ppp', ff, step)
+        GT,pre,mask = self.mcpx(bh,tocken,masktocken)
+        writer.add_figure('M/GT', GT, step)
+        writer.add_figure('M/pre', pre, step)
+        writer.add_figure('M/mask', mask, step)
         writer.flush()
 
-    def mcpx(self,bh:torch.Tensor,tocken):
+    def mcpx(self,bh:torch.Tensor,tocken,masktocken):
         # import random
 
         # from matplotlib import cm
@@ -137,6 +138,12 @@ class FORT_encode(pt.LightningModule):
         for i,idk in enumerate(tk):
             ddd[i][idk]=1
         ddd=ddd.cpu().numpy()
+
+        tk2 = masktocken[0].detach().cpu().numpy()
+        ddd2 = torch.zeros(aaa.size())
+        for i, idk in enumerate(tk2):
+            ddd2[i][idk] = 1
+        ddd2 = ddd2.cpu().numpy()
 
 
 
@@ -166,7 +173,13 @@ class FORT_encode(pt.LightningModule):
         im = ax.imshow(cxcx, )
             # 增加右侧的颜色刻度条
         plt.colorbar(im)
-        return fig,fig2
+
+        fig3 = plt.figure()
+        ax3 = fig3.add_subplot(111)
+        im3 = ax3.imshow(ddd2, )
+        plt.colorbar(im3)
+
+        return fig,fig2,fig3
             # 增加标题
             # plt.title("This is a title", fontproperties=font)
             # show
@@ -182,8 +195,8 @@ class FORT_encode(pt.LightningModule):
 if __name__=='__main__':
     writer = SummaryWriter("./mdsr_1000s/", )
     modss=FORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.5,attdropout=0.05)
+    # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = dastset('映射.json', 'fix1.json', './i')
-
     from pytorch_lightning import loggers as pl_loggers
 
     tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"lagegeFDbignet_1000")
@@ -193,7 +206,7 @@ if __name__=='__main__':
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
-    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=12,shuffle=True
+    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=8,shuffle=True
                                                    ,num_workers=0
                                                    ))
 
