@@ -13,6 +13,7 @@ import os
 from fontTools.ttLib import TTFont
 from PIL import ImageFont, Image, ImageDraw
 from torchvision import transforms
+from tqdm import tqdm
 
 
 class dastset(Dataset):
@@ -28,7 +29,8 @@ class dastset(Dataset):
             # words = f.read()
             mappi=json.loads(f.read())
         jsonnn = {}
-        for i in words:
+
+        for i in tqdm(words):
 
             list1 = []
             cc = words[i]
@@ -45,7 +47,7 @@ class dastset(Dataset):
         self.data_path=data_path
         self.cpnt={}
 
-        for j in self.wordd:
+        for j in tqdm(self.wordd):
             tk=self.wordd[j]
             w_len = len(tk)
 
@@ -59,7 +61,7 @@ class dastset(Dataset):
         inxlen=[]
         axc=0
         avxl=[]
-        for i in patht:
+        for i in tqdm(patht):
             ppp=self.get_mask_and_path(i)
             ctx=len(ppp)
             axc=axc+ctx

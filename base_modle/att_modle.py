@@ -91,27 +91,33 @@ class cross_att_lay(nn.Module):
         super().__init__()
         self.attention_bh = attention(dim, heads, inner_dim, attdropout, att_type)
         self.attention_img = attention(dim, heads, inner_dim, attdropout, att_type)
+        self.satt_bh= attention(dim, heads, inner_dim, attdropout, att_type)
+        self.satt_img = attention(dim, heads, inner_dim, attdropout, att_type)
 
         self.Mlp_bh = MLP_T1(dim, jhhc, mlpdropout, pox)
         self.Mlp_img = MLP_T1(dim, jhhc, mlpdropout, pox)
         self.ln_bh1 = nn.LayerNorm(dim, eps=1e-12)
         self.ln_bh2 = nn.LayerNorm(dim, eps=1e-12)
+        self.ln_bh3=nn.LayerNorm(dim, eps=1e-12)
 
         self.ln_img1 = nn.LayerNorm(dim, eps=1e-12)
         self.ln_img2 = nn.LayerNorm(dim, eps=1e-12)
+        self.ln_img3 = nn.LayerNorm(dim, eps=1e-12)
 
     def forward(self, x_img, y_bh, bh_attention_mask=None, img_attention_mask=None):
-        # y_bhs = self.ln_bh1(self.attention_bh(x_img, x_img, y_bh, img_attention_mask) + y_bh)
-        # y_bhs = self.ln_bh2(self.Mlp_bh(y_bhs) + y_bhs)
+        y_bhs =self.ln_bh3(self.satt_bh(y_bh, y_bh, y_bh, bh_attention_mask)+y_bh)
+        y_bhs = self.ln_bh1(self.attention_bh(x_img, x_img, y_bhs, img_attention_mask) + y_bhs)
+        y_bhs = self.ln_bh2(self.Mlp_bh(y_bhs) + y_bhs)
+
+        x_img=self.ln_img3(self.satt_img(x_img,x_img,x_img,img_attention_mask)+ x_img)
+        x_img = self.ln_img1(self.attention_bh(y_bh, y_bh, x_img, bh_attention_mask) + x_img)
+        x_img = self.ln_img2(self.Mlp_bh(x_img) + x_img)
         #
-        # x_img = self.ln_img1(self.attention_bh(y_bh, y_bh, x_img, bh_attention_mask) + x_img)
-        # x_img = self.ln_img2(self.Mlp_bh(x_img) + x_img)
-
-        y_bhs = self.attention_bh(self.ln_img1 (x_img), self.ln_img1 (x_img), self.ln_bh1(y_bh), img_attention_mask) + y_bh
-        y_bhs = self.Mlp_bh(self.ln_bh2(y_bhs)) + y_bhs
-
-        x_img = self.attention_bh(self.ln_bh1(y_bh), self.ln_bh1(y_bh), self.ln_img1 (x_img), bh_attention_mask) + x_img
-        x_img = self.Mlp_bh(self.ln_img2 (x_img)) + x_img
+        # y_bhs = self.attention_bh(self.ln_img1 (x_img), self.ln_img1 (x_img), self.ln_bh1(y_bh), img_attention_mask) + y_bh
+        # y_bhs = self.Mlp_bh(self.ln_bh2(y_bhs)) + y_bhs
+        #
+        # x_img = self.attention_bh(self.ln_bh1(y_bh), self.ln_bh1(y_bh), self.ln_img1 (x_img), bh_attention_mask) + x_img
+        # x_img = self.Mlp_bh(self.ln_img2 (x_img)) + x_img
 
         return x_img, y_bhs,
 
@@ -127,10 +133,10 @@ class self_att_lay(nn.Module):
         self.ln_bh2 = nn.LayerNorm(dim, eps=1e-12)
 
     def forward(self, x, attention_mask=None):
-        # x = self.ln_bh1(self.attention_bh(x, x, x, attention_mask) + x)
-        # x = self.ln_bh2(self.Mlp_bh(x) + x)
-        x = self.attention_bh(self.ln_bh1(x), self.ln_bh1(x), self.ln_bh1(x), attention_mask) + x
-        x = self.ln_bh2(self.Mlp_bh(self.ln_bh2(x)) + x)
+        x = self.ln_bh1(self.attention_bh(x, x, x, attention_mask) + x)
+        x = self.ln_bh2(self.Mlp_bh(x) + x)
+        # x = self.attention_bh(self.ln_bh1(x), self.ln_bh1(x), self.ln_bh1(x), attention_mask) + x
+        # x = self.ln_bh2(self.Mlp_bh(self.ln_bh2(x)) + x)
 
         return x
 

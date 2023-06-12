@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle
 from base_modle.dataset import dastset
-
+from matplotlib import pyplot as plt
 
 class GLU(nn.Module):
     def __init__(self, dim):
@@ -65,7 +65,7 @@ class FORT_encode(pt.LightningModule):
         return img,bh
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.0002)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.00005)
 
         return {"optimizer": optimizer,
                 # "lr_scheduler": lt
@@ -77,14 +77,15 @@ class FORT_encode(pt.LightningModule):
 
         img,bh=self.forward(img_tensor,masktocken,bhmask=padmask)
 
-        loss_img=nn.SmoothL1Loss()(img_tensor,img)
+        # loss_img=nn.SmoothL1Loss()(img_tensor,img)
+        loss_img = nn.L1Loss()(img_tensor, img)
 
-        bh = rearrange(bh, 'b n s -> b s n ', )
-        bhloss=nn.CrossEntropyLoss()(bh,tocken.long())
+        bhs = rearrange(bh, 'b n s -> b s n ', )
+        bhloss=nn.CrossEntropyLoss(ignore_index=0)(bhs,tocken.long())
         # bhloss=0
 
         if batch_idx%10==0:
-            self.wwww(img,img_tensor,loss_img,bhloss)
+            self.wwww(img,img_tensor,loss_img,bhloss,bh,tocken)
 
 
         return (loss_img+bhloss)/2
@@ -94,7 +95,7 @@ class FORT_encode(pt.LightningModule):
         # print(optimizer.state_dict()['param_groups'][0]['lr'],self.global_step)
         self.lrc = optimizer.state_dict()['param_groups'][0]['lr']
 
-    def wwww(self,img,img2,loss1,loss2,):
+    def wwww(self,img,img2,loss1,loss2,bh,tocken):
 
 
         step=self.global_step
@@ -103,13 +104,76 @@ class FORT_encode(pt.LightningModule):
         # writer = tensorboard
         # writer.add_audio('feature/audio', features['audio'][0], step, sample_rate=self.params.sample_rate)
 
+
         writer.add_scalar('train/loss1', loss1, step)
         writer.add_scalar('train/loss2', loss2, step)
         writer.add_scalar('train/grad_norm', self.grad_norm, step)
         writer.add_scalar('train/lr', self.lrc, step)
         writer.add_images('train/img',img.float(), step)
         writer.add_images('train/gtimg', img2.float(), step)
+
+
+
+
+
+        fff,ff = self.mcpx(bh,tocken)
+        writer.add_figure('train/ggg', fff, step)
+        writer.add_figure('train/ppp', ff, step)
         writer.flush()
+
+    def mcpx(self,bh:torch.Tensor,tocken):
+        # import random
+
+        # from matplotlib import cm
+        # from matplotlib import axes
+        # from matplotlib.font_manager import FontProperties
+        # font = FontProperties(fname='/Library/Fonts/Songti.ttc')
+        aaa=nn.Softmax()(bh[0])
+
+        cxcx=aaa.detach().cpu().numpy()
+
+        tk =tocken[0].detach().cpu().numpy()
+        ddd=torch.zeros(aaa.size())
+        for i,idk in enumerate(tk):
+            ddd[i][idk]=1
+        ddd=ddd.cpu().numpy()
+
+
+
+
+
+
+
+            # 定义热图的横纵坐标
+
+            # 准备数据阶段，利用random生成二维数据（5*5）
+
+            # 作图阶段
+        fig = plt.figure()
+            # 定义画布为1*1个划分，并在第1个位置上进行作图
+        ax = fig.add_subplot(111)
+        fig2 = plt.figure()
+        ax2 = fig2.add_subplot(111)
+        im2 = ax2.imshow(ddd, )
+        # 增加右侧的颜色刻度条
+        plt.colorbar(im2)
+            # 定义横纵坐标的刻度
+            # ax.set_yticks(range(len(yLabel)))
+            # ax.set_yticklabels(yLabel, fontproperties=font)
+            # ax.set_xticks(range(len(xLabel)))
+            # ax.set_xticklabels(xLabel)
+            # 作图并选择热图的颜色填充风格，这里选择hot
+        im = ax.imshow(cxcx, )
+            # 增加右侧的颜色刻度条
+        plt.colorbar(im)
+        return fig,fig2
+            # 增加标题
+            # plt.title("This is a title", fontproperties=font)
+            # show
+
+
+
+
 
 
 
@@ -117,7 +181,7 @@ class FORT_encode(pt.LightningModule):
 
 if __name__=='__main__':
     writer = SummaryWriter("./mdsr_1000s/", )
-    modss=FORT_encode(ATTlays=5,bhlay=4,imglay=6,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.5,attdropout=0.05)
+    modss=FORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.5,attdropout=0.05)
     aaaa = dastset('映射.json', 'fix1.json', './i')
 
     from pytorch_lightning import loggers as pl_loggers
@@ -125,12 +189,12 @@ if __name__=='__main__':
     tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"lagegeFDbignet_1000")
 
 
-    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,precision='bf16'
+    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,#precision='bf16'
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
     trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=12,shuffle=True
-                                                   #,num_workers=1
+                                                   ,num_workers=0
                                                    ))
 
 
