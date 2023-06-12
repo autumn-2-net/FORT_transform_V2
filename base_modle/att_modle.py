@@ -127,8 +127,10 @@ class self_att_lay(nn.Module):
         self.ln_bh2 = nn.LayerNorm(dim, eps=1e-12)
 
     def forward(self, x, attention_mask=None):
-        x = self.ln_bh1(self.attention_bh(x, x, x, attention_mask) + x)
-        x = self.ln_bh2(self.Mlp_bh(x) + x)
+        # x = self.ln_bh1(self.attention_bh(x, x, x, attention_mask) + x)
+        # x = self.ln_bh2(self.Mlp_bh(x) + x)
+        x = self.attention_bh(self.ln_bh1(x), self.ln_bh1(x), self.ln_bh1(x), attention_mask) + x
+        x = self.ln_bh2(self.Mlp_bh(self.ln_bh2(x)) + x)
 
         return x
 
