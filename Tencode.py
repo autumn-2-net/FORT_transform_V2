@@ -117,7 +117,7 @@ class FORT_encode(pt.LightningModule):
 
 if __name__=='__main__':
     writer = SummaryWriter("./mdsr_1000s/", )
-    modss=FORT_encode(ATTlays=5,bhlay=6,imglay=4,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.5,attdropout=0.05)
+    modss=FORT_encode(ATTlays=5,bhlay=4,imglay=6,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.5,attdropout=0.05)
     aaaa = dastset('映射.json', 'fix1.json', './i')
 
     from pytorch_lightning import loggers as pl_loggers
@@ -125,7 +125,7 @@ if __name__=='__main__':
     tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"lagegeFDbignet_1000")
 
 
-    trainer = Trainer(accelerator='gpu',gradient_clip_val=0.1,logger=tensorboard,max_epochs=400,precision='bf16'
+    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,precision='bf16'
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
