@@ -5,6 +5,7 @@ import lightning as pt
 from einops import rearrange
 from lightning import Trainer
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle
 from base_modle.dataset import dastset
@@ -45,6 +46,8 @@ class FORT_encode(pt.LightningModule):
             # nn.Sigmoid()
             nn.ReLU(),
             )
+        self.grad_norm = 0
+        self.lrc = 0.0002
 
 
 
@@ -62,7 +65,7 @@ class FORT_encode(pt.LightningModule):
         return img,bh
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.002)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.0002)
 
         return {"optimizer": optimizer,
                 # "lr_scheduler": lt
@@ -76,17 +79,44 @@ class FORT_encode(pt.LightningModule):
 
         loss_img=nn.SmoothL1Loss()(img_tensor,img)
 
-        # bh = rearrange(bh, 'b n s -> b s n ', )
-        # bhloss=nn.CrossEntropyLoss()(bh,tocken.long())
-        bhloss=0
+        bh = rearrange(bh, 'b n s -> b s n ', )
+        bhloss=nn.CrossEntropyLoss()(bh,tocken.long())
+        # bhloss=0
+
+        if batch_idx%10==0:
+            self.wwww(img,img_tensor,loss_img,bhloss)
+
 
         return (loss_img+bhloss)/2
+    # def on_after_backward(self):
+    #     self.grad_norm = nn.utils.clip_grad_norm_(self.parameters(),  1e9)
+    def on_before_zero_grad(self, optimizer):
+        # print(optimizer.state_dict()['param_groups'][0]['lr'],self.global_step)
+        self.lrc = optimizer.state_dict()['param_groups'][0]['lr']
+
+    def wwww(self,img,img2,loss1,loss2,):
+
+
+        step=self.global_step
+        # writer = tensorboard.SummaryWriter
+
+        # writer = tensorboard
+        # writer.add_audio('feature/audio', features['audio'][0], step, sample_rate=self.params.sample_rate)
+
+        writer.add_scalar('train/loss1', loss1, step)
+        writer.add_scalar('train/loss2', loss2, step)
+        writer.add_scalar('train/grad_norm', self.grad_norm, step)
+        writer.add_scalar('train/lr', self.lrc, step)
+        writer.add_images('train/img',img.float(), step)
+        writer.add_images('train/gtimg', img2.float(), step)
+        writer.flush()
+
 
 
 
 
 if __name__=='__main__':
-
+    writer = SummaryWriter("./mdsr_1000s/", )
     modss=FORT_encode(ATTlays=5,bhlay=6,imglay=4,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.5,attdropout=0.05)
     aaaa = dastset('映射.json', 'fix1.json', './i')
 
@@ -95,11 +125,11 @@ if __name__=='__main__':
     tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"lagegeFDbignet_1000")
 
 
-    trainer = Trainer(accelerator='gpu',gradient_clip_val=0.1,logger=tensorboard,max_epochs=400
+    trainer = Trainer(accelerator='gpu',gradient_clip_val=0.1,logger=tensorboard,max_epochs=400,precision='bf16'
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
-    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=6
+    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=12,shuffle=True
                                                    #,num_workers=1
                                                    ))
 
