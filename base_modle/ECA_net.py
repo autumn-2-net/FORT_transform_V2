@@ -43,15 +43,15 @@ class ECABasicBlock(nn.Module):
 
     def __init__(self, inchannel, k_size=3 ):
         super(ECABasicBlock, self).__init__()
-        self.conv1 = nn.Conv2d(inchannel,inchannel*2,kernel_size=(3,3),padding=1)
+        self.conv1 = nn.Conv2d(inchannel,inchannel,kernel_size=(3,3),padding=1)
         # self.bn1 = SwitchNorm2d(inchannel)
-        self.bn1 = nn.GroupNorm(inchannel)
+        self.bn1 = nn.GroupNorm(4,inchannel)
         self.relu = nn.ReLU()
         # self.relu = GLU(1)
-        self.conv2 = nn.Conv2d(inchannel,inchannel*2,kernel_size=(3,3),padding=1)
+        self.conv2 = nn.Conv2d(inchannel,inchannel,kernel_size=(3,3),padding=1)
         # self.conv3 = nn.Conv2d(inchannel, inchannel , kernel_size=(3, 3), padding=1)
         # self.bn2 = SwitchNorm2d(inchannel)
-        self.bn2 = nn.GroupNorm(inchannel)(inchannel)
+        self.bn2 = nn.GroupNorm(4,inchannel)
         self.eca = eca_layer(inchannel, k_size)
         self.relus = nn.LeakyReLU()
 

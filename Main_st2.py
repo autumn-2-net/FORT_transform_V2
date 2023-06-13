@@ -31,20 +31,22 @@ class PFORT_DECODE(pt.LightningModule):
     def __init__(self, dim, eaclay):
         super().__init__()
         self.eacnet=nn.Sequential(*[ECABasicBlock(dim) for _ in range(eaclay)])
+        self.eacnet2 = nn.Sequential(*[ECABasicBlock(dim) for _ in range(eaclay)])
+
         # self.eacnet = Gres_modle(eaclay,dim)
-        self.eacnet = res_modle(eaclay, dim)
-        # self.decode = nn.Sequential(
-        #     nn.ConvTranspose2d(in_channels=dim, out_channels=512, kernel_size=(15, 15), stride=2,
-        #                        padding=0), GLU(1),
-        #     nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=(8, 8), stride=2,
-        #                        padding=1), GLU(1),
-        #     nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=(8, 8), stride=2,
-        #                        padding=2), GLU(1),
-        #     nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=(8, 8), stride=2,
-        #                        padding=1),
-        #     # nn.Sigmoid()
-        #     nn.Softplus(),
-        #     )
+        # self.eacnet = res_modle(eaclay, dim)
+        self.decode = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=dim*2, out_channels=512, kernel_size=(15, 15), stride=2,
+                               padding=0), GLU(1),
+            nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=(8, 8), stride=2,
+                               padding=1), GLU(1),
+            nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=(8, 8), stride=2,
+                               padding=2), GLU(1),
+            nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=(8, 8), stride=2,
+                               padding=1),
+            # nn.Sigmoid()
+            nn.Softplus(),
+            )
         # self.decode = nn.Sequential(
         #     nn.ConvTranspose2d(in_channels=dim, out_channels=256, kernel_size=(15, 15), stride=2,
         #                        padding=0), nn.ELU(),
@@ -65,7 +67,7 @@ class PFORT_DECODE(pt.LightningModule):
 
     def forward(self,img_feature1,img_feature2):
         img_feature1=self.eacnet(img_feature1)
-        img_feature2 = self.eacnet(img_feature2)
+        img_feature2 = self.eacnet2(img_feature2)
         # img_feature1, _= img_feature1.chunk(2, dim=1)
         # _, img_feature2 = img_feature2.chunk(2, dim=1)
 
@@ -144,7 +146,7 @@ class PFORT_DECODE(pt.LightningModule):
 
 if __name__=='__main__':
     writer = SummaryWriter("./st2_log/", )
-    modss=PFORT_DECODE(dim=512,eaclay=12)
+    modss=PFORT_DECODE(dim=512,eaclay=5)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = st2_dataset('V2_dataset_stage2.hdf5','st2_rcmap','st2_map','./i/','img_mapss')
     from pytorch_lightning import loggers as pl_loggers
