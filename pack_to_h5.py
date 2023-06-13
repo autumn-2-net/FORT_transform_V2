@@ -21,7 +21,7 @@ from tqdm import tqdm
 #     pass
 
 class dastset():
-    def __init__(self,mapping,Word_path,data_path,max_tocken_len=32):
+    def __init__(self,mapping,Word_path,data_path,max_tocken_len=32,compression_opts=9):
 
         patht=os.listdir(data_path)
         self.max_len=max_tocken_len
@@ -75,7 +75,7 @@ class dastset():
                     cpx[str(n)]=ii[0]
                     im = Image.open(ii[1])
                     img = np.array(im)
-                    f.create_dataset(str(n), data=img)
+                    f.create_dataset(str(n), data=img,compression="gzip", compression_opts=compression_opts)
 
 
 
