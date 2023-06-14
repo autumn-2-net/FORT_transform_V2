@@ -12,7 +12,7 @@ from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle,PATT
 from base_modle.dataset import dastset,Fdastset
 from matplotlib import pyplot as plt
 
-from base_modle.scheduler import WarmupLR
+from base_modle.scheduler import WarmupLR, SGDRLR
 
 
 class GLU(nn.Module):
@@ -231,6 +231,8 @@ class PFORT_encode(pt.LightningModule):
 
     def forward(self,x_img,y_bh,imgmask=None,bhmask=None):
         img_feature= rearrange(self.resc(self.in_cov(x_img)), 'b c h w -> b (h w) c')
+        # img_feature = rearrange(self.in_cov(x_img), 'b c h w -> b (h w) c')
+
         img_feature=self.EMA(img_feature,0,imgmask)
 
         bh_feature=self.EMA(y_bh,1,bhmask)
@@ -242,9 +244,11 @@ class PFORT_encode(pt.LightningModule):
         return img,bh
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.0001)
+        # optimizer = torch.optim.AdamW(self.parameters(), lr=0.00011)
+        optimizer = torch.optim.SGD(self.parameters(), lr=0.00011)
         lt = {
-            "scheduler": WarmupLR(optimizer, 25000, 5e-5),  # 调度器
+            "scheduler": SGDRLR(optimizer, 25000, T_0=15000, eta_max=0.0001, eta_min=0.000001,T_mul=1,T_mult=1.1),  # 调度器
+            #"scheduler": WarmupLR(optimizer, 25000, 6e-5),  # 调度器
             "interval": 'step',  # 调度的单位，epoch或step
 
             "reduce_on_plateau": False,  # ReduceLROnPlateau
@@ -269,7 +273,7 @@ class PFORT_encode(pt.LightningModule):
         bhloss=nn.CrossEntropyLoss(ignore_index=0)(bhs,tocken.long())
         # bhloss=0
 
-        if batch_idx%50==0:
+        if batch_idx%10==0:
             self.wwww(batch_idx,img,img_tensor,loss_img,bhloss,bh,tocken,masktocken)
 
 
@@ -294,7 +298,7 @@ class PFORT_encode(pt.LightningModule):
         writer.add_scalar('train/loss2', loss2, step)
         writer.add_scalar('train/grad_norm', self.grad_norm, step)
         writer.add_scalar('train/lr', self.lrc, step)
-        if batch_idx % 200 == 0:
+        if batch_idx % 100 == 0:
             writer.add_images('train/img',img.float(), step)
             writer.add_images('train/gtimg', img2.float(), step)
 
@@ -371,12 +375,14 @@ class PFORT_encode(pt.LightningModule):
 
     def encode(self,x_img,y_bh,imgmask=None,bhmask=None):
         img_feature= rearrange(self.resc(self.in_cov(x_img)), 'b c h w -> b (h w) c')
+        # img_feature = rearrange(self.in_cov(x_img), 'b c h w -> b (h w) c')
         img_feature=self.EMA(img_feature,0,imgmask)
 
         bh_feature=self.EMA(y_bh,1,bhmask)
 
         img_feature,bh=self.ATT(img_feature,bh_feature, bh_attention_mask=bhmask, img_attention_mask=imgmask)
         img_feature = rearrange(img_feature, 'b (h w) c -> b c h w', h=8)
+
 
         return img_feature
 
@@ -398,9 +404,9 @@ if __name__=='__main__':
 
         # monitor = 'val/loss',
 
-        dirpath='./mdscp',
+        dirpath='./mdscpNres',
 
-        filename='sample-mnist-epoch{epoch:02d}-{epoch}-{step}',
+        filename='V3-epoch{epoch:02d}-{epoch}-{step}',
 
         auto_insert_metric_name=False#, every_n_epochs=20
         , save_top_k=-1,every_n_train_steps=15000
@@ -411,7 +417,8 @@ if __name__=='__main__':
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
-    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=4,shuffle=True
+    modss=modss.load_from_checkpoint('./mdscpNres/V2-epoch00-0-30000.ckpt',ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=8,shuffle=True
                                                    ,num_workers=4,prefetch_factor =16,pin_memory=True,
                                                    ))
 

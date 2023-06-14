@@ -155,7 +155,7 @@ if __name__=='__main__':
 
     modss=PFORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
-    modss.load_from_checkpoint('./mdscp/sample-mnist-epoch01-1-150000.ckpt',ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    modss=modss.load_from_checkpoint('./mdscpNres/V2-epoch00-0-30000.ckpt',ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
     modss.eval().cuda()
     aaaa=dastsetss('映射.json', 'fix1.json', './i')
 
@@ -182,7 +182,8 @@ if __name__=='__main__':
 
                 pppoio[str(ftt)][str(idx)]=str(ci)
                 pppoioF[str(ftt)][str(ci)] = str(idx)
-                f.create_dataset(f'{str(ftt)}_{str(idx)}', data=featrue_img.detach().cpu().numpy(), compression="gzip", compression_opts=6)
+                f.create_dataset(f'{str(ftt)}_{str(idx)}', data=featrue_img.detach().cpu().numpy(), compression="gzip",compression_opts=9#('ec'|'nn', even integer 0-32)
+                                 )
 
                 pass
 

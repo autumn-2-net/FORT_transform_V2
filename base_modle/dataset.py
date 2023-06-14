@@ -114,9 +114,11 @@ class dastset(Dataset):
         tocken,mask,w_len=self.cpnt[tock][0],self.cpnt[tock][1],self.cpnt[tock][2]
 
         maskf = w_len // 2 +1
+        if random.randint(0, 20) == 1:
+            maskf= w_len+10
         masktocken=tocken.copy()
         for i in range(maskf):
-            if random.randint(0,20) == 1:
+            if random.randint(0,500) == 1:
                 break
             mxk=random.randint(0,w_len-1)
             masktocken[mxk]=43
