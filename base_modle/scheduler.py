@@ -248,29 +248,18 @@ class V2LSGDRLR(_LRScheduler):
 
         return cur_lr
 class V3LSGDRLR(_LRScheduler):
-    """The WarmupLR scheduler
-
+    """The WarmupLR schedulerA
         This scheduler is almost same as NoamLR Scheduler except for following
         difference:
-
         NoamLR:
             lr = optimizer.lr * model_size ** -0.5
                  * min(step ** -0.5, step * warmup_step ** -1.5)
         WarmupLR:
             lr = optimizer.lr * warmup_step ** 0.5
                  * min(step ** -0.5, step * warmup_step ** -1.5)
-
         Note that the maximum lr equals to optimizer.lr in this scheduler.
-
         """
-
-    def __init__(
-                self,
-                optimizer: torch.optim.Optimizer,
-                warmup_steps: Union[int, float] = 25000,
-                min_lr=1e-5,
-                last_epoch: int = -1, T_0=1500, eta_max=0.1, eta_min=0., T_mul=2, T_mult=0.9999
-        ):
+    def __init__(self,optimizer: torch.optim.Optimizer,warmup_steps: Union[int, float] = 25000,min_lr=1e-5,last_epoch: int = -1, T_0=1500, eta_max=0.1, eta_min=0., T_mul=2, T_mult=0.9999):
             # assert check_argument_types()
         self.warmup_steps = warmup_steps
         self.min_lr = min_lr
@@ -279,25 +268,18 @@ class V3LSGDRLR(_LRScheduler):
         self.eta_max = eta_max
         self.T_mul = T_mul
         self.T_mult = T_mult
-
-
         super().__init__(optimizer, last_epoch)
-
     def __repr__(self):
         return f"{self.__class__.__name__}(warmup_steps={self.warmup_steps}, lr={self.base_lr}, min_lr={self.min_lr}, last_epoch={self.last_epoch})"
-
     def ctxadjust_lr(self, T_0=15000, eta_min=0.00006, eta_max=0.00009, tmctx=0.98, ws=5000):
         step_num = self.last_epoch + 1
-
         T_cur = (step_num + ws) % T_0
         T_i = T_0
         T_curX = (step_num + ws) // T_0
-
         cur_lr = eta_min * (tmctx ** T_curX) + 0.5 * (eta_max * (tmctx ** T_curX) - eta_min * (tmctx ** T_curX)) * (
                     1 + np.cos(np.pi * T_cur / T_i))
         if ws > step_num:
             cur_lr = step_num * (eta_max / ws)
-
         return cur_lr
 
 
