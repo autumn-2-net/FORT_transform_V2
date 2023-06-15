@@ -1,3 +1,4 @@
+from base_modle.SWN import SwitchNorm2d
 from base_modle.att_modle import self_attention, coross_attention
 from base_modle.att_modle_pre import Pself_attention, Pcoross_attention, post_Pself_attention, post_Pcoross_attention
 from base_modle.positemb import RelPositionalEncoding
@@ -155,6 +156,22 @@ class cov_encode(nn.Module):
     def forward(self, x):
         a =self.cov1(x)
         return self.cov2(a)
+
+class Pcov_encode(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.cov1 = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=150, kernel_size=(5, 5), stride=2,padding=2), GLU(1),SwitchNorm2d(75),
+                                  nn.Conv2d(in_channels=75, out_channels=300, kernel_size=(5, 5), stride=2,padding=2), GLU(1),SwitchNorm2d(150),
+                                  nn.Conv2d(in_channels=150, out_channels=600, kernel_size=(5, 5), stride=2,padding=2), GLU(1),SwitchNorm2d(300),
+                                  nn.Conv2d(in_channels=300, out_channels=1024, kernel_size=(5, 5), stride=2,padding=2), GLU(1),SwitchNorm2d(512),
+                                  nn.Conv2d(in_channels=512, out_channels=1024, kernel_size=(5, 5), stride=2,
+                                            padding=2), GLU(1),SwitchNorm2d(512),
+                                  )
+
+
+    def forward(self, x):
+        a =self.cov1(x)
+        return a
     
 class EMBDim(nn.Module):
     def __init__(self,dim,max_tochen_len=48,postlen=65,embt='REL',drop=0.0):

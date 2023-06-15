@@ -8,11 +8,12 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle, PATT_encode, post_PATT_encode
+from base_modle.SWN import SwitchNorm2d
+from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle, PATT_encode, post_PATT_encode, Pcov_encode
 from base_modle.dataset import dastset,Fdastset
 from matplotlib import pyplot as plt
 
-from base_modle.scheduler import WarmupLR, SGDRLR, V2LSGDRLR
+from base_modle.scheduler import WarmupLR, SGDRLR, V2LSGDRLR,V3LSGDRLR
 
 
 class GLU(nn.Module):
@@ -211,30 +212,32 @@ class PFORT_encode(pt.LightningModule):
                               jhhc)
 
         self.EMA = EMBDim(dim, max_tochen_len=max_tochen_len, postlen=postlen, embt=embt, drop=pos_emb_drop)
-        self.resc=res_modle(rea_lays,512)
-        self.in_cov=cov_encode()
+        # self.resc=res_modle(rea_lays,512)
+        self.in_cov=Pcov_encode()
 
         self.decode = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=dim, out_channels=512, kernel_size=(15, 15), stride=2,
-                               padding=0), GLU(1),
-            nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=(8, 8), stride=2,
-                               padding=1), GLU(1),
-            nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=(8, 8), stride=2,
-                               padding=2), GLU(1),
-            nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=(8, 8), stride=2,
-                               padding=1),
-            # nn.Sigmoid()
-            nn.ReLU(),
+            nn.ConvTranspose2d(in_channels=dim, out_channels=666, kernel_size=(5, 5), stride=2,
+                               padding=1), GLU(1),SwitchNorm2d(333),
+            nn.ConvTranspose2d(in_channels=333, out_channels=400, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1),SwitchNorm2d(200),
+            nn.ConvTranspose2d(in_channels=200, out_channels=300, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1),SwitchNorm2d(150),
+            nn.ConvTranspose2d(in_channels=150, out_channels=200, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1),SwitchNorm2d(100),
+            nn.ConvTranspose2d(in_channels=100, out_channels=3, kernel_size=(6, 6), stride=2,
+                               padding=3),
+            nn.Sigmoid()
+            # nn.Softmax(),
             )
         self.grad_norm = 0
-        self.lrc = 0.0002
+        self.lrc = 0.0
 
 
 
 
     def forward(self,x_img,y_bh,imgmask=None,bhmask=None):
-        img_feature= rearrange(self.resc(self.in_cov(x_img)), 'b c h w -> b (h w) c')
-        # img_feature = rearrange(self.in_cov(x_img), 'b c h w -> b (h w) c')
+        # img_feature= rearrange(self.resc(self.in_cov(x_img)), 'b c h w -> b (h w) c')
+        img_feature = rearrange(self.in_cov(x_img), 'b c h w -> b (h w) c')
 
         img_feature=self.EMA(img_feature,0,imgmask)
 
@@ -247,12 +250,12 @@ class PFORT_encode(pt.LightningModule):
         return img,bh
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.0001)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.00010)
         # optimizer = torch.optim.SGD(self.parameters(), lr=0.00011)
         lt = {
             # "scheduler": SGDRLR(optimizer, 25000, T_0=15000, eta_max=0.0001, eta_min=0.000001,T_mul=1,T_mult=1.1),  # 调度器
             # "scheduler": WarmupLR(optimizer, 5000, 8e-5),  # 调度器
-            "scheduler": V2LSGDRLR(optimizer,),  # 调度器
+            "scheduler": V3LSGDRLR(optimizer,),  # 调度器
             "interval": 'step',  # 调度的单位，epoch或step
 
             "reduce_on_plateau": False,  # ReduceLROnPlateau
@@ -378,8 +381,8 @@ class PFORT_encode(pt.LightningModule):
             # show'
 
     def encode(self,x_img,y_bh,imgmask=None,bhmask=None):
-        img_feature= rearrange(self.resc(self.in_cov(x_img)), 'b c h w -> b (h w) c')
-        # img_feature = rearrange(self.in_cov(x_img), 'b c h w -> b (h w) c')
+        # img_feature= rearrange(self.resc(self.in_cov(x_img)), 'b c h w -> b (h w) c')
+        img_feature = rearrange(self.in_cov(x_img), 'b c h w -> b (h w) c')
         img_feature=self.EMA(img_feature,0,imgmask)
 
         bh_feature=self.EMA(y_bh,1,bhmask)
@@ -410,8 +413,8 @@ class PFORT_encode(pt.LightningModule):
 
 if __name__=='__main__':
     writer = SummaryWriter("./Post_encode/", )
-    # modss=PFORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
-    modss = PFORT_encode(ATTlays=5, bhlay=9, imglay=5, dim=512, heads=8, inner_dim=512, out_dim=48, pos_emb_drop=0.1,
+    # modss=FORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    modss = PFORT_encode(ATTlays=6, bhlay=9, imglay=5, dim=512, heads=8, inner_dim=512, out_dim=48, pos_emb_drop=0.1,
                          mlpdropout=0.05, attdropout=0.05)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = dastset('映射.json', 'fix1.json', './i')
@@ -426,7 +429,7 @@ if __name__=='__main__':
 
         dirpath='./post_LN',
 
-        filename='V4-epoch{epoch:02d}-{epoch}-{step}',
+        filename='V5-epoch{epoch:02d}-{epoch}-{step}',
 
         auto_insert_metric_name=False#, every_n_epochs=20
         , save_top_k=-1,every_n_train_steps=15000
