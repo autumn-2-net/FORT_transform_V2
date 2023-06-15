@@ -44,7 +44,46 @@ class attention(nn.Module):
         out = self.to_out(out)
         return self.dropout(out)
 
+class Xattention(nn.Module):
+    def __init__(self, dim, heads, inner_dim, dropout=0.0, att_type=None):
+        super().__init__()
+        if att_type is None:
+            att_type = {}
+        assert dim % heads == 0, 'dimension must be divisible by number of heads'
+        self.dim_head = dim / heads
+        self.heads = heads
 
+        self.to_q = nn.Linear(dim, inner_dim)
+        self.to_k = nn.Linear(dim, inner_dim)
+        self.to_v = nn.Linear(dim, inner_dim)
+        self.to_out = nn.Linear(inner_dim, dim)
+        nn.init.xavier_normal_(self.to_q.weight, gain=0.3)
+        nn.init.xavier_normal_(self.to_k.weight, gain=0.3)
+        nn.init.xavier_normal_(self.to_v.weight, gain=0.3)
+        nn.init.xavier_normal_(self.to_out.weight, gain=0.3)
+
+        # nn.init.xavier_normal_(self.to_q.bias, gain=0.3)
+        # nn.init.xavier_normal_(self.to_k.bias, gain=0.3)
+        # nn.init.xavier_normal_(self.to_v.bias, gain=0.3)
+        # nn.init.xavier_normal_(self.to_out.bias, gain=0.3)
+        self.dropout = nn.Dropout(dropout)
+
+        self.att_type = att_type
+
+    def forward(self, k, v, q, attn_mask=None):
+
+        q, k, v = self.to_q(q), self.to_k(v), self.to_v(k)
+
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), (q, k, v))
+        if attn_mask is not None:
+            attn_mask = attn_mask.unsqueeze(1).unsqueeze(1)==1
+
+        with torch.backends.cuda.sdp_kernel(**self.att_type):
+            x = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, )
+
+        out = rearrange(x, 'b h n d -> b n (h d)')
+        out = self.to_out(out)
+        return self.dropout(out)
 @torch.jit.script
 def swish(x):
     return x * torch.sigmoid(x)
@@ -173,13 +212,22 @@ class Pself_attention(nn.Module):
         return x
 
 
+
+
+
+
+
+
+
+
+
 class post_cross_att_lay(nn.Module):
     def __init__(self, dim, heads, inner_dim, mlpdropout=0.0, pox=4, attdropout=0.0, att_type=None, jhhc='GELU'):
         super().__init__()
-        self.attention_bh = attention(dim, heads, inner_dim, attdropout, att_type)
-        self.attention_img = attention(dim, heads, inner_dim, attdropout, att_type)
-        self.satt_bh= attention(dim, heads, inner_dim, attdropout, att_type)
-        self.satt_img = attention(dim, heads, inner_dim, attdropout, att_type)
+        self.attention_bh = Xattention(dim, heads, inner_dim, attdropout, att_type)
+        self.attention_img = Xattention(dim, heads, inner_dim, attdropout, att_type)
+        self.satt_bh= Xattention(dim, heads, inner_dim, attdropout, att_type)
+        self.satt_img = Xattention(dim, heads, inner_dim, attdropout, att_type)
 
         self.Mlp_bh = MLP_T1(dim, jhhc, mlpdropout, pox)
         self.Mlp_img = MLP_T1(dim, jhhc, mlpdropout, pox)
@@ -215,7 +263,7 @@ class post_cross_att_lay(nn.Module):
 class post_self_att_lay(nn.Module):
     def __init__(self, dim, heads, inner_dim, mlpdropout=0.0, pox=4, attdropout=0.0, att_type=None, jhhc='GELU'):
         super().__init__()
-        self.attention_bh = attention(dim, heads, inner_dim, attdropout, att_type)
+        self.attention_bh = Xattention(dim, heads, inner_dim, attdropout, att_type)
 
         self.Mlp_bh = MLP_T1(dim, jhhc, mlpdropout, pox)
 
@@ -244,7 +292,7 @@ class post_Pcoross_attention(nn.Module):
     def forward(self, x_img, y_bh, bh_attention_mask=None, img_attention_mask=None):
         for lay in self.lix:
             x_img, y_bh, = lay(x_img, y_bh, bh_attention_mask, img_attention_mask)
-        return self.lnn1(x_img), self.lnn2(y_bh),
+        return x_img, y_bh
 
 
 class post_Pself_attention(nn.Module):

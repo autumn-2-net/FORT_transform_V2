@@ -8,11 +8,11 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle,PATT_encode
+from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle, PATT_encode, post_PATT_encode
 from base_modle.dataset import dastset,Fdastset
 from matplotlib import pyplot as plt
 
-from base_modle.scheduler import WarmupLR, SGDRLR
+from base_modle.scheduler import WarmupLR, SGDRLR, V2LSGDRLR
 
 
 class GLU(nn.Module):
@@ -203,7 +203,10 @@ class PFORT_encode(pt.LightningModule):
                  pos_emb_drop=0.0, mlpdropout=0.0, attdropout=0.0, pox=4, att_type=None,
                  jhhc='Swish',rea_lays=4):
         super().__init__()
-        self.ATT = PATT_encode(ATTlays, bhlay, imglay, dim, heads, inner_dim, out_dim, mlpdropout, attdropout, pox,
+        # self.ATT = PATT_encode(ATTlays, bhlay, imglay, dim, heads, inner_dim, out_dim, mlpdropout, attdropout, pox,
+        #                       att_type,
+        #                       jhhc)
+        self.ATT=post_PATT_encode(ATTlays, bhlay, imglay, dim, heads, inner_dim, out_dim, mlpdropout, attdropout, pox,
                               att_type,
                               jhhc)
 
@@ -248,7 +251,8 @@ class PFORT_encode(pt.LightningModule):
         # optimizer = torch.optim.SGD(self.parameters(), lr=0.00011)
         lt = {
             # "scheduler": SGDRLR(optimizer, 25000, T_0=15000, eta_max=0.0001, eta_min=0.000001,T_mul=1,T_mult=1.1),  # 调度器
-            "scheduler": WarmupLR(optimizer, 5000, 8e-5),  # 调度器
+            # "scheduler": WarmupLR(optimizer, 5000, 8e-5),  # 调度器
+            "scheduler": V2LSGDRLR(optimizer,),  # 调度器
             "interval": 'step',  # 调度的单位，epoch或step
 
             "reduce_on_plateau": False,  # ReduceLROnPlateau
@@ -387,30 +391,33 @@ class PFORT_encode(pt.LightningModule):
         return img_feature
 
 
-def ModelParamsInit(model,bb):
-    assert isinstance(model, nn.Module)
-    for m in model.modules():
-        # if isinstance(m, (nn.Conv3d, nn.ConvTranspose3d, nn.Linear)):
-        #     trunc_normal_(m.weight, std=0.02)
-        #     if m.bias is not None:
-        #         nn.init.constant_(m.bias, 0)
-        # elif isinstance(m, (nn.LayerNorm, nn.BatchNorm3d)):
-        if m.weight is not None:
-            nn.init.xavier_normal_(m.weight, gain=bb)
-        if m.bias is not None:
-            nn.init.xavier_normal_(m.bias, gain=bb)
+# def ModelParamsInit(model,bb):
+#     assert isinstance(model, nn.Module)
+#     for m in model.modules():
+#         # if isinstance(m, (nn.Conv3d, nn.ConvTranspose3d, nn.Linear)):
+#         #     trunc_normal_(m.weight, std=0.02)
+#         #     if m.bias is not None:
+#         #         nn.init.constant_(m.bias, 0)
+#         # elif isinstance(m, (nn.LayerNorm, nn.BatchNorm3d)):
+#
+#         if m.weight is not None:
+#             nn.init.xavier_normal_(m.weight, gain=bb)
+#         if m.bias is not None:
+#             nn.init.xavier_normal_(m.bias, gain=bb)
 
 
 
 
 if __name__=='__main__':
     writer = SummaryWriter("./Post_encode/", )
-    modss=PFORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    # modss=PFORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    modss = PFORT_encode(ATTlays=5, bhlay=9, imglay=5, dim=512, heads=8, inner_dim=512, out_dim=48, pos_emb_drop=0.1,
+                         mlpdropout=0.05, attdropout=0.05)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = dastset('映射.json', 'fix1.json', './i')
     from pytorch_lightning import loggers as pl_loggers
 ##################################
-    ModelParamsInit(modss) ##############
+    # ModelParamsInit(modss,0.3) ##############
 ####################################
     tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"FORT_modle")
     checkpoint_callback = ModelCheckpoint(
