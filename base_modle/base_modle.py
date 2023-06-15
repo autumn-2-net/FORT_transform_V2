@@ -1,5 +1,5 @@
 from base_modle.att_modle import self_attention, coross_attention
-from base_modle.att_modle_pre import Pself_attention, Pcoross_attention
+from base_modle.att_modle_pre import Pself_attention, Pcoross_attention, post_Pself_attention, post_Pcoross_attention
 from base_modle.positemb import RelPositionalEncoding
 import torch
 
@@ -39,6 +39,27 @@ class PATT_encode(nn.Module):
         self.sfa_bh = Pself_attention(bhlay, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
         self.sfa_img = Pself_attention(imglay, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
         self.croa = Pcoross_attention(lays, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
+
+        self.bh_out1 = nn.Linear(dim, 4*dim)
+        self.bh_out2 = nn.Linear(dim*2, out_dim)
+        self.avx=GLU(2)
+
+    def forward(self, x_img, y_bh, bh_attention_mask=None, img_attention_mask=None):
+        e_img = self.sfa_img(x_img, img_attention_mask)
+        e_bh = self.sfa_bh(y_bh, bh_attention_mask)
+
+        img, bh = self.croa(e_img, e_bh, bh_attention_mask, img_attention_mask)
+        acsfd=self.avx(self.bh_out1(bh))
+
+        return img, self.bh_out2(acsfd)
+
+class post_PATT_encode(nn.Module):
+    def __init__(self, lays,bhlay,imglay, dim, heads, inner_dim, out_dim, mlpdropout=0.0, attdropout=0.0, pox=4, att_type=None,
+                 jhhc='GELU'):
+        super().__init__()
+        self.sfa_bh = post_Pself_attention(bhlay, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
+        self.sfa_img =  post_Pself_attention(imglay, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
+        self.croa =  post_Pcoross_attention(lays, dim, heads, inner_dim, mlpdropout, attdropout, pox, att_type, jhhc)
 
         self.bh_out1 = nn.Linear(dim, 4*dim)
         self.bh_out2 = nn.Linear(dim*2, out_dim)

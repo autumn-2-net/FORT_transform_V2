@@ -50,7 +50,7 @@ def swish(x):
     return x * torch.sigmoid(x)
 
 
-class GLU(nn.Module):
+class GLUX(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.dim = dim
@@ -72,7 +72,7 @@ class MLP_T1(nn.Module):
         elif jhhc == 'Swish':
             self.hc = swish
         elif jhhc == 'GLU':
-            self.hc = GLU(dim=dim)
+            self.hc = GLUX(dim=dim)
         else:
             raise Exception('不支持方法')
 
@@ -171,6 +171,114 @@ class Pself_attention(nn.Module):
         for lay in self.lix:
             x = lay(x, attention_mask, )
         return x
+
+
+class post_cross_att_lay(nn.Module):
+    def __init__(self, dim, heads, inner_dim, mlpdropout=0.0, pox=4, attdropout=0.0, att_type=None, jhhc='GELU'):
+        super().__init__()
+        self.attention_bh = attention(dim, heads, inner_dim, attdropout, att_type)
+        self.attention_img = attention(dim, heads, inner_dim, attdropout, att_type)
+        self.satt_bh= attention(dim, heads, inner_dim, attdropout, att_type)
+        self.satt_img = attention(dim, heads, inner_dim, attdropout, att_type)
+
+        self.Mlp_bh = MLP_T1(dim, jhhc, mlpdropout, pox)
+        self.Mlp_img = MLP_T1(dim, jhhc, mlpdropout, pox)
+        self.ln_bh1 = nn.LayerNorm(dim, eps=1e-12)
+        self.ln_bh2 = nn.LayerNorm(dim, eps=1e-12)
+        self.ln_bh3=nn.LayerNorm(dim, eps=1e-12)
+
+        self.ln_img1 = nn.LayerNorm(dim, eps=1e-12)
+        self.ln_img2 = nn.LayerNorm(dim, eps=1e-12)
+        self.ln_img3 = nn.LayerNorm(dim, eps=1e-12)
+
+    def forward(self, x_img, y_bh, bh_attention_mask=None, img_attention_mask=None):
+
+        y_bhs = self.ln_bh1 (self.attention_bh(x_img, x_img, y_bh, img_attention_mask) + y_bh)
+        y_bhs = self.ln_bh2 (self.satt_bh(y_bhs, y_bhs, y_bhs, bh_attention_mask) + y_bhs)
+        y_bhs = self.ln_bh3(self.Mlp_bh(y_bhs) + y_bhs)
+
+
+        x_img = self.ln_img1(self.attention_bh(y_bh, y_bh, x_img, bh_attention_mask) + x_img)
+        x_img = self.ln_img2(self.satt_img(x_img,x_img, x_img, img_attention_mask) + x_img)
+
+        x_img = self.ln_img3 (self.Mlp_bh(x_img) + x_img)
+        #
+        # y_bhs = self.attention_bh(self.ln_img1 (x_img), self.ln_img1 (x_img), self.ln_bh1(y_bh), img_attention_mask) + y_bh
+        # y_bhs = self.Mlp_bh(self.ln_bh2(y_bhs)) + y_bhs
+        #
+        # x_img = self.attention_bh(self.ln_bh1(y_bh), self.ln_bh1(y_bh), self.ln_img1 (x_img), bh_attention_mask) + x_img
+        # x_img = self.Mlp_bh(self.ln_img2 (x_img)) + x_img
+
+        return x_img, y_bhs,
+
+
+class post_self_att_lay(nn.Module):
+    def __init__(self, dim, heads, inner_dim, mlpdropout=0.0, pox=4, attdropout=0.0, att_type=None, jhhc='GELU'):
+        super().__init__()
+        self.attention_bh = attention(dim, heads, inner_dim, attdropout, att_type)
+
+        self.Mlp_bh = MLP_T1(dim, jhhc, mlpdropout, pox)
+
+        self.ln_bh1 = nn.LayerNorm(dim, eps=1e-12)
+        self.ln_bh2 = nn.LayerNorm(dim, eps=1e-12)
+
+    def forward(self, x, attention_mask=None):
+        x =self.ln_bh1 ( self.attention_bh(x,x,x, attention_mask) + x)
+        x = self.ln_bh2(self.Mlp_bh(x) + x)
+        # x = self.attention_bh(self.ln_bh1(x), self.ln_bh1(x), self.ln_bh1(x), attention_mask) + x
+        # x = self.ln_bh2(self.Mlp_bh(self.ln_bh2(x)) + x)
+
+        return x
+
+
+class post_Pcoross_attention(nn.Module):
+    def __init__(self, cross_lays, dim, heads, inner_dim, mlpdropout=0.0, attdropout=0.0, pox=4, att_type=None,
+                 jhhc='GELU'):
+        super().__init__()
+        self.lix = nn.ModuleList()
+        self.lnn1=nn.LayerNorm(dim, eps=1e-12)
+        self.lnn2= nn.LayerNorm(dim, eps=1e-12)
+        for i in range(cross_lays):
+            self.lix.append(post_cross_att_lay(dim, heads, inner_dim, mlpdropout, pox, attdropout, att_type, jhhc))
+
+    def forward(self, x_img, y_bh, bh_attention_mask=None, img_attention_mask=None):
+        for lay in self.lix:
+            x_img, y_bh, = lay(x_img, y_bh, bh_attention_mask, img_attention_mask)
+        return self.lnn1(x_img), self.lnn2(y_bh),
+
+
+class post_Pself_attention(nn.Module):
+    def __init__(self, lays, dim, heads, inner_dim, mlpdropout=0.0, attdropout=0.0, pox=4, att_type=None, jhhc='GELU'):
+        super().__init__()
+        self.lix = nn.ModuleList()
+        for i in range(lays):
+            self.lix.append(post_self_att_lay(dim, heads, inner_dim, mlpdropout, pox, attdropout, att_type, jhhc))
+
+    def forward(self, x, attention_mask=None):
+        for lay in self.lix:
+            x = lay(x, attention_mask, )
+        return x
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':

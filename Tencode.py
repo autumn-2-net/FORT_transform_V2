@@ -244,11 +244,11 @@ class PFORT_encode(pt.LightningModule):
         return img,bh
 
     def configure_optimizers(self):
-        # optimizer = torch.optim.AdamW(self.parameters(), lr=0.00011)
-        optimizer = torch.optim.SGD(self.parameters(), lr=0.00011)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.0001)
+        # optimizer = torch.optim.SGD(self.parameters(), lr=0.00011)
         lt = {
-            "scheduler": SGDRLR(optimizer, 25000, T_0=15000, eta_max=0.0001, eta_min=0.000001,T_mul=1,T_mult=1.1),  # 调度器
-            #"scheduler": WarmupLR(optimizer, 25000, 6e-5),  # 调度器
+            # "scheduler": SGDRLR(optimizer, 25000, T_0=15000, eta_max=0.0001, eta_min=0.000001,T_mul=1,T_mult=1.1),  # 调度器
+            "scheduler": WarmupLR(optimizer, 5000, 8e-5),  # 调度器
             "interval": 'step',  # 调度的单位，epoch或step
 
             "reduce_on_plateau": False,  # ReduceLROnPlateau
@@ -387,26 +387,39 @@ class PFORT_encode(pt.LightningModule):
         return img_feature
 
 
-
+def ModelParamsInit(model,bb):
+    assert isinstance(model, nn.Module)
+    for m in model.modules():
+        # if isinstance(m, (nn.Conv3d, nn.ConvTranspose3d, nn.Linear)):
+        #     trunc_normal_(m.weight, std=0.02)
+        #     if m.bias is not None:
+        #         nn.init.constant_(m.bias, 0)
+        # elif isinstance(m, (nn.LayerNorm, nn.BatchNorm3d)):
+        if m.weight is not None:
+            nn.init.xavier_normal_(m.weight, gain=bb)
+        if m.bias is not None:
+            nn.init.xavier_normal_(m.bias, gain=bb)
 
 
 
 
 if __name__=='__main__':
-    writer = SummaryWriter("./mdsr_1000s/", )
+    writer = SummaryWriter("./Post_encode/", )
     modss=PFORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = dastset('映射.json', 'fix1.json', './i')
     from pytorch_lightning import loggers as pl_loggers
-
+##################################
+    ModelParamsInit(modss) ##############
+####################################
     tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"FORT_modle")
     checkpoint_callback = ModelCheckpoint(
 
         # monitor = 'val/loss',
 
-        dirpath='./mdscpNres',
+        dirpath='./post_LN',
 
-        filename='V3-epoch{epoch:02d}-{epoch}-{step}',
+        filename='V4-epoch{epoch:02d}-{epoch}-{step}',
 
         auto_insert_metric_name=False#, every_n_epochs=20
         , save_top_k=-1,every_n_train_steps=15000
@@ -417,7 +430,7 @@ if __name__=='__main__':
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
-    modss=modss.load_from_checkpoint('./mdscpNres/V2-epoch00-0-30000.ckpt',ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    # modss=modss.load_from_checkpoint('./mdscpNres/V3-epoch01-1-60000.ckpt',ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
     trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=8,shuffle=True
                                                    ,num_workers=4,prefetch_factor =16,pin_memory=True,
                                                    ))
