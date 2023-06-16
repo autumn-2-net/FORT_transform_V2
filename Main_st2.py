@@ -1,3 +1,6 @@
+from typing import Union
+
+import numpy as np
 import torch
 import torch.nn as nn
 # import pytorch_lightning as pt
@@ -8,6 +11,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+from base_modle.SWN import SwitchNorm2d
 from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle,PATT_encode,Gres_modle
 from base_modle.dataset import dastset,Fdastset
 from matplotlib import pyplot as plt
@@ -36,17 +40,19 @@ class PFORT_DECODE(pt.LightningModule):
         # self.eacnet = Gres_modle(eaclay,dim)
         # self.eacnet = res_modle(eaclay, dim)
         self.decode = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=dim, out_channels=512, kernel_size=(15, 15), stride=2,
-                               padding=0), GLU(1),
-            nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=(8, 8), stride=2,
-                               padding=1), GLU(1),
-            nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=(8, 8), stride=2,
-                               padding=2), GLU(1),
-            nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=(8, 8), stride=2,
-                               padding=1),
-            # nn.Sigmoid()
-            nn.Softplus(),
-            )
+            nn.ConvTranspose2d(in_channels=dim, out_channels=666, kernel_size=(5, 5), stride=2,
+                               padding=1), GLU(1), SwitchNorm2d(333),
+            nn.ConvTranspose2d(in_channels=333, out_channels=400, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(200),
+            nn.ConvTranspose2d(in_channels=200, out_channels=300, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(150),
+            nn.ConvTranspose2d(in_channels=150, out_channels=200, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(100),
+            nn.ConvTranspose2d(in_channels=100, out_channels=3, kernel_size=(6, 6), stride=2,
+                               padding=3),
+            nn.Softplus()
+            # nn.Softmax(),
+        )
         # self.decode = nn.Sequential(
         #     nn.ConvTranspose2d(in_channels=dim, out_channels=256, kernel_size=(15, 15), stride=2,
         #                        padding=0), nn.ELU(),
@@ -91,17 +97,17 @@ class PFORT_DECODE(pt.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=0.0001)
-        # lt = {
-        #     "scheduler": WarmupLR(optimizer, 5000, 1e-4),  # 调度器
-        #     "interval": 'step',  # 调度的单位，epoch或step
-        #
-        #     "reduce_on_plateau": False,  # ReduceLROnPlateau
-        #     "monitor": "val_loss",  # ReduceLROnPlateau的监控指标
-        #     "strict": False  # 如果没有monitor，是否中断训练
-        # }
+        lt = {
+            "scheduler": V3LSGDRLR(optimizer,),  # 调度器
+            "interval": 'step',  # 调度的单位，epoch或step
+
+            "reduce_on_plateau": False,  # ReduceLROnPlateau
+            "monitor": "val_loss",  # ReduceLROnPlateau的监控指标
+            "strict": False  # 如果没有monitor，是否中断训练
+        }
 
         return {"optimizer": optimizer,
-                # "lr_scheduler": lt
+                "lr_scheduler": lt
                 }
 
 
@@ -159,9 +165,9 @@ class PFORT_DECODE(pt.LightningModule):
 
 if __name__=='__main__':
     writer = SummaryWriter("./st2_log/", )
-    modss=PFORT_DECODE(dim=512,eaclay=7)
+    modss=PFORT_DECODE(dim=512,eaclay=4)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
-    aaaa = st2_dataset('V2_dataset_stage2.hdf5','st2_rcmap','st2_map','./i/','img_mapss')
+    aaaa = st2_dataset('V2_dataset_stage2.hdf5','st2_rcmap','st2_map','./i/','img_maps')
     from pytorch_lightning import loggers as pl_loggers
 
     tensorboard = pl_loggers.TensorBoardLogger(save_dir=r"FORT_modle_ST2")
@@ -171,7 +177,7 @@ if __name__=='__main__':
 
         dirpath='./mdscpss',
 
-        filename='V2-epoch{epoch:02d}-{epoch}-{step}',
+        filename='Ve1-epoch{epoch:02d}-{epoch}-{step}',
 
         auto_insert_metric_name=False#, every_n_epochs=20
         , save_top_k=-1,every_n_train_steps=30000

@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torch.nn as nn
 # import pytorch_lightning as pt
@@ -15,7 +17,7 @@ from matplotlib import pyplot as plt
 
 from base_modle.scheduler import WarmupLR, SGDRLR, V2LSGDRLR,V3LSGDRLR
 
-
+os.environ["TORCH_CUDNN_V8_API_ENABLED"] = "1"
 class GLU(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -235,6 +237,7 @@ class PFORT_encode(pt.LightningModule):
 
 
 
+
     def forward(self,x_img,y_bh,imgmask=None,bhmask=None):
         # img_feature= rearrange(self.resc(self.in_cov(x_img)), 'b c h w -> b (h w) c')
         img_feature = rearrange(self.in_cov(x_img), 'b c h w -> b (h w) c')
@@ -294,7 +297,7 @@ class PFORT_encode(pt.LightningModule):
     def wwww(self,batch_idx,img,img2,loss1,loss2,bh,tocken,masktocken):
 
 
-        step=self.global_step
+        step=self.global_step +360000
         # writer = tensorboard.SummaryWriter
 
         # writer = tensorboard
@@ -392,7 +395,12 @@ class PFORT_encode(pt.LightningModule):
 
 
         return img_feature
+    def decodess(self,x_img):
+        # img_feature= rearrange(self.resc(self.in_cov(x_img)), 'b c h w -> b (h w) c')
+        img = self.decode(x_img)
 
+
+        return img
 
 # def ModelParamsInit(model,bb):
 #     assert isinstance(model, nn.Module)
@@ -429,18 +437,18 @@ if __name__=='__main__':
 
         dirpath='./post_LN',
 
-        filename='V5-epoch{epoch:02d}-{epoch}-{step}',
+        filename='V6-epoch{epoch:02d}-{epoch}-{step}',
 
         auto_insert_metric_name=False#, every_n_epochs=20
         , save_top_k=-1,every_n_train_steps=15000
 
     )
 
-    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,callbacks=[checkpoint_callback],#precision='bf16'
+    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,callbacks=[checkpoint_callback],precision='bf16'
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
-    modss=modss.load_from_checkpoint('./post_LN/V5-epoch00-0-15000.ckpt',ATTlays=6,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    modss=modss.load_from_checkpoint('./post_LN/V5-epoch09-9-360000.ckpt',ATTlays=6,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
     trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=8,shuffle=True
                                                    ,num_workers=4,prefetch_factor =16,pin_memory=True,
                                                    ))

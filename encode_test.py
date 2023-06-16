@@ -2,6 +2,7 @@ import json
 import os
 
 import h5py
+
 import numpy as np
 import torch
 from PIL import Image
@@ -153,9 +154,11 @@ class dastsetss(Dataset):
 
 if __name__=='__main__':
 
-    modss=PFORT_encode(ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    modss=PFORT_encode(ATTlays=6, bhlay=9, imglay=5, dim=512, heads=8, inner_dim=512, out_dim=48, pos_emb_drop=0.1,
+                         mlpdropout=0.05, attdropout=0.05)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
-    modss=modss.load_from_checkpoint('./mdscpNres/V2-epoch00-0-30000.ckpt',ATTlays=5,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    modss=modss.load_from_checkpoint('./post_LN/V6-epoch06-6-240000.ckpt',ATTlays=6, bhlay=9, imglay=5, dim=512, heads=8, inner_dim=512, out_dim=48, pos_emb_drop=0.1,
+                         mlpdropout=0.05, attdropout=0.05)
     modss.eval().cuda()
     aaaa=dastsetss('映射.json', 'fix1.json', './i')
 

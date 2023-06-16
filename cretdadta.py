@@ -9,10 +9,11 @@ from tqdm import tqdm
 
 
 class data_create():
-    def __init__(self,map_path,w_path,ttf_path):
+    def __init__(self,map_path,w_path,ttf_path,out):
         self.map_path = map_path
         self.w_path = w_path
         self.ttf_path = ttf_path
+        self.out=out
 
         with open(w_path, 'r', encoding='utf-8') as f:
             # words = f.read()
@@ -52,9 +53,9 @@ class data_create():
         #     return tocken, imggg
         rree=[]
         for i in tqdm(self.tttfp):
-            rree.append(( i,'./i',i.split('\\')[-1],self.wordd))
+            rree.append(( i,self.out,i.split('\\')[-1],self.wordd))
         # for i in self.tttfp:
-        with ProcessPoolExecutor(max_workers=4) as executor:
+        with ProcessPoolExecutor(max_workers=8) as executor:
             list(tqdm(executor.map(make_and_w,rree), desc='Preprocessing', total=len(self.tttfp)))
 
             # make_and_w(i,'./i',i.split('\\')[-1],self.wordd)
@@ -194,5 +195,5 @@ def make_and_wT(cx):
 
 if __name__=='__main__':
     # aas=data_test(w_path='fix1.json', map_path='映射.json', ttf_path='./tds/')
-    aas = data_create(w_path='fix1.json', map_path='映射.json', ttf_path='./tds/')
+    aas = data_create(w_path='V2_dast.json', map_path='映射.json', ttf_path='./tds/',out='./opp')
     aas.get_anc_c()

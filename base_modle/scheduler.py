@@ -272,7 +272,7 @@ class V3LSGDRLR(_LRScheduler):
     def __repr__(self):
         return f"{self.__class__.__name__}(warmup_steps={self.warmup_steps}, lr={self.base_lr}, min_lr={self.min_lr}, last_epoch={self.last_epoch})"
     def ctxadjust_lr(self, T_0=15000, eta_min=0.00006, eta_max=0.00009, tmctx=0.98, ws=5000):
-        step_num = self.last_epoch + 1
+        step_num = self.last_epoch + 1 #+360000
         T_cur = (step_num + ws) % T_0
         T_i = T_0
         T_curX = (step_num + ws) // T_0
