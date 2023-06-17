@@ -391,7 +391,7 @@ class GAN_PFORT_DECODE(pt.LightningModule):
 
 if __name__=='__main__':
     writer = SummaryWriter("./st2_log/", )
-    modss=GAN_PFORT_DECODE(dim=512,eaclay=5)
+    modss=PFORT_DECODE(dim=512,eaclay=5)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = st2_dataset('V2_dataset_stage2.hdf5','st2_rcmap','st2_map','./i/','img_maps')
     from pytorch_lightning import loggers as pl_loggers
