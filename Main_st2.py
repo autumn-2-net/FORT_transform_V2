@@ -1,5 +1,9 @@
-from typing import Union
 
+import os
+
+from base_modle.Wganu import calculate_gradient_penalty
+
+os.environ["TORCH_CUDNN_V8_API_ENABLED"] = "1"
 import numpy as np
 import torch
 import torch.nn as nn
@@ -16,7 +20,7 @@ from base_modle.base_modle import cov_encode, ATT_encode, EMBDim, res_modle,PATT
 from base_modle.dataset import dastset,Fdastset
 from matplotlib import pyplot as plt
 
-from base_modle.scheduler import WarmupLR
+from base_modle.scheduler import WarmupLR, V3LSGDRLR
 from base_modle.ECA_net import ECABasicBlock
 
 from base_modle.st2_ds_h5 import st2_dataset
@@ -29,6 +33,15 @@ class GLU(nn.Module):
     def forward(self, x):
         out, gate = x.chunk(2, dim=self.dim)
         return out * gate.sigmoid()
+class RGLU(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+        self.rrr=nn.Softplus()
+
+    def forward(self, x):
+        out, gate = x.chunk(2, dim=self.dim)
+        return self.rrr(out) * gate.sigmoid()
 
 
 class PFORT_DECODE(pt.LightningModule):
@@ -159,6 +172,209 @@ class PFORT_DECODE(pt.LightningModule):
         #     writer.add_figure('M/mask', mask, step)
         writer.flush()
 
+class Dx(nn.Module):
+    def __init__(self,dim):
+        super().__init__()
+        self.cov1 = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=150, kernel_size=(5, 5), stride=2, padding=2),
+                                  GLU(1), SwitchNorm2d(75),
+                                  nn.Conv2d(in_channels=75, out_channels=300, kernel_size=(5, 5), stride=2, padding=2),
+                                  GLU(1), SwitchNorm2d(150),
+                                  nn.Conv2d(in_channels=150, out_channels=600, kernel_size=(5, 5), stride=2, padding=2),
+                                  GLU(1), SwitchNorm2d(300),
+                                  nn.Conv2d(in_channels=300, out_channels=1024, kernel_size=(5, 5), stride=2,
+                                            padding=2), GLU(1), SwitchNorm2d(512),
+
+                                  )
+        self.eacnetD = nn.Sequential(*[ECABasicBlock(dim) for _ in range(6)])
+
+    def forward(self,img):
+        return self.eacnetD (self.cov1(img))
+
+
+class Gx(nn.Module):
+    def __init__(self, dim,eaclay):
+        super().__init__()
+        self.eacnet = nn.Sequential(*[ECABasicBlock(dim) for _ in range(eaclay)])
+
+        self.decode = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=dim, out_channels=666, kernel_size=(5, 5), stride=2,
+                               padding=1), GLU(1), SwitchNorm2d(333),
+            nn.ConvTranspose2d(in_channels=333, out_channels=400, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(200),
+            nn.ConvTranspose2d(in_channels=200, out_channels=300, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(150),
+            nn.ConvTranspose2d(in_channels=150, out_channels=200, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(100),
+            nn.ConvTranspose2d(in_channels=100, out_channels=6, kernel_size=(4, 4), stride=2,
+                               padding=2),
+            RGLU(1)
+
+        )
+    def forward(self,img_feature1,img_feature2):
+
+
+
+        img_feature1=self.eacnet(img_feature1)
+        img_feature2 = self.eacnet(img_feature2)
+
+        img_feature1, _= img_feature1.chunk(2, dim=1)
+        _, img_feature2 = img_feature2.chunk(2, dim=1)
+
+        feature=torch.cat((img_feature1,img_feature2),dim=1)
+        img=self.decode(feature)
+
+
+        return img
+
+
+class GAN_PFORT_DECODE(pt.LightningModule):
+    def __init__(self, dim, eaclay):
+        super().__init__()
+        self.GG=Gx(dim=dim,eaclay=eaclay)
+        self.dd=Dx(dim=dim)
+
+        self.grad_norm = 0
+        self.lrc = 0.0000
+
+
+        self.automatic_optimization = False
+
+
+
+
+    def forward(self,img_feature1,img_feature2):
+
+        #
+        #
+        # img_feature1=self.eacnet(img_feature1)
+        # img_feature2 = self.eacnet(img_feature2)
+        #
+        # img_feature1, _= img_feature1.chunk(2, dim=1)
+        # _, img_feature2 = img_feature2.chunk(2, dim=1)
+        #
+        # feature=torch.cat((img_feature1,img_feature2),dim=1)
+        # img=self.decode(feature)
+
+
+        return self.GG(img_feature1,img_feature2)
+
+    def configure_optimizers(self):
+        optimizerG = torch.optim.AdamW(self.GG.parameters(), lr=0.0001)
+        optimizerD = torch.optim.AdamW(self.GG.parameters(), lr=0.0001)
+        ltG = {
+            "scheduler": V3LSGDRLR(optimizerG,),  # 调度器
+            "interval": 'step',  # 调度的单位，epoch或step
+
+            "reduce_on_plateau": False,  # ReduceLROnPlateau
+            "monitor": "val_loss",  # ReduceLROnPlateau的监控指标
+            "strict": False  # 如果没有monitor，是否中断训练
+        }
+        ltD = {
+            "scheduler": V3LSGDRLR(optimizerD, ),  # 调度器
+            "interval": 'step',  # 调度的单位，epoch或step
+
+            "reduce_on_plateau": False,  # ReduceLROnPlateau
+            "monitor": "val_loss",  # ReduceLROnPlateau的监控指标
+            "strict": False  # 如果没有monitor，是否中断训练
+        }
+
+        return [optimizerG, optimizerD], [ltG,ltD]
+
+    def training_step(self, batch, batch_idx):
+        img_f1, img_f2, t_img, img1,img2=batch
+        opt_g, opt_d = self.optimizers()
+        sch_g, sch_d = self.lr_schedulers()
+
+
+##############################################
+#           TD                               #
+##############################################
+        # loss_img = nn.L1Loss()(t_img, img)
+        # img = self.forward(img_f1, img_f2)
+
+        real_output = self.Dx(t_img)
+        errD_real = torch.mean(torch.flatten(real_output))
+        D_x = torch.flatten(real_output).mean().item()
+
+        # Generate fake image batch with G
+        fake_images = self.forward(img_f1, img_f2)
+
+        # Train with fake
+        fake_output = self.Dx(fake_images)
+        errD_fake = -torch.mean(torch.flatten(fake_output))
+        D_G_z1 = torch.flatten(fake_output).mean().item()
+
+        # Calculate W-div gradient penalty
+        gradient_penalty = calculate_gradient_penalty(t_img, fake_images,
+                                                      real_output, fake_output, 2, 6,
+                                                      img_f1.device)
+
+        # Add the gradients from the all-real and all-fake batches
+        errDloss = errD_real + errD_fake + gradient_penalty
+        # errD.backward()
+        # Update D
+        # self.optimizer_d.step()
+###############################       ###################################
+        opt_d.zero_grad()
+        self.manual_backward(errDloss)
+        opt_d.step()
+###############################################################
+
+        ##############################################
+        #           TG                               #
+        ##############################################
+        # self.generator.zero_grad()
+        # Generate fake image batch with G
+        fake_images = self.forward(img_f1, img_f2)
+        fake_output = self.Dx(fake_images)
+        errG = torch.mean(torch.flatten(fake_output))
+        D_G_z2 = torch.flatten(fake_output).mean().item()
+        loss_img = nn.L1Loss()(t_img, fake_images)
+
+        opt_g.zero_grad()
+        self.manual_backward((errG+loss_img))
+        opt_g.step()
+
+
+        if batch_idx%50==0:
+            self.wwww(batch_idx,loss_img, t_img, img1,img2,fake_images,D_G_z2,D_G_z1,D_x)
+
+
+        # return loss_img
+
+    def on_before_zero_grad(self, optimizer):
+        # print(optimizer.state_dict()['param_groups'][0]['lr'],self.global_step)
+        self.lrc = optimizer.state_dict()['param_groups'][0]['lr']
+
+    def wwww(self,batch_idx,loss1, t_img, img1,img2,oimg,D_G_z2,D_G_z1,D_x):
+
+
+        step=self.global_step
+        # writer = tensorboard.SummaryWriter
+
+        # writer = tensorboard
+        # writer.add_audio('feature/audio', features['audio'][0], step, sample_rate=self.params.sample_rate)
+
+        writer.add_scalar('GANtrain/D_xTrue', D_x, step)
+        writer.add_scalar('GANtrain/D_xfack', D_G_z1, step)
+        writer.add_scalar('GANtrain/G_ganx', D_G_z2, step)
+
+        writer.add_scalar('train/loss1', loss1, step)
+        # writer.add_scalar('train/loss2', loss2, step)
+        writer.add_scalar('train/grad_norm', self.grad_norm, step)
+        writer.add_scalar('train/lr', self.lrc, step)
+        if batch_idx % 200 == 0:
+            writer.add_images('train_img/out',oimg.float(), step)
+            writer.add_images('train_img/GTimg', t_img.float(), step)
+            writer.add_images('train_img/INimg1', img1.float(), step)
+            writer.add_images('train_img/INimg2', img2.float(), step)
+        # if batch_idx % 100 == 0:
+        #     GT,pre,mask = self.mcpx(bh,tocken,masktocken)
+        #     writer.add_figure('M/GT', GT, step)
+        #     writer.add_figure('M/pre', pre, step)
+        #     writer.add_figure('M/mask', mask, step)
+        writer.flush()
+
 
 
 
@@ -175,7 +391,7 @@ if __name__=='__main__':
 
         # monitor = 'val/loss',
 
-        dirpath='./mdscpss',
+        dirpath='./std_ckpt',
 
         filename='Ve1-epoch{epoch:02d}-{epoch}-{step}',
 
@@ -184,7 +400,7 @@ if __name__=='__main__':
 
     )
 
-    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,callbacks=[checkpoint_callback],#precision='bf16'
+    trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,callbacks=[checkpoint_callback],precision='bf16'
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')

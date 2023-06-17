@@ -1,5 +1,5 @@
 import os
-
+os.environ["TORCH_CUDNN_V8_API_ENABLED"] = "1"
 import torch
 import torch.nn as nn
 # import pytorch_lightning as pt
@@ -17,7 +17,7 @@ from matplotlib import pyplot as plt
 
 from base_modle.scheduler import WarmupLR, SGDRLR, V2LSGDRLR,V3LSGDRLR
 
-os.environ["TORCH_CUDNN_V8_API_ENABLED"] = "1"
+
 class GLU(nn.Module):
     def __init__(self, dim):
         super().__init__()
