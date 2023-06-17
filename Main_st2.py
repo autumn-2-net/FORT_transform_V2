@@ -1,9 +1,9 @@
-
 import os
+os.environ["TORCH_CUDNN_V8_API_ENABLED"] = "1"
 
 from base_modle.Wganu import calculate_gradient_penalty
 
-os.environ["TORCH_CUDNN_V8_API_ENABLED"] = "1"
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -175,20 +175,22 @@ class PFORT_DECODE(pt.LightningModule):
 class Dx(nn.Module):
     def __init__(self,dim):
         super().__init__()
-        self.cov1 = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=150, kernel_size=(5, 5), stride=2, padding=2),
+        self.cov1 = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=64, kernel_size=(5, 5), stride=2, padding=2),
+                                  GLU(1), SwitchNorm2d(32),
+                                  nn.Conv2d(in_channels=32, out_channels=100, kernel_size=(5, 5), stride=2, padding=2),
+                                  GLU(1), SwitchNorm2d(50),
+                                  nn.Conv2d(in_channels=50, out_channels=150, kernel_size=(5, 5), stride=2, padding=2),
                                   GLU(1), SwitchNorm2d(75),
-                                  nn.Conv2d(in_channels=75, out_channels=300, kernel_size=(5, 5), stride=2, padding=2),
-                                  GLU(1), SwitchNorm2d(150),
-                                  nn.Conv2d(in_channels=150, out_channels=600, kernel_size=(5, 5), stride=2, padding=2),
-                                  GLU(1), SwitchNorm2d(300),
-                                  nn.Conv2d(in_channels=300, out_channels=1024, kernel_size=(5, 5), stride=2,
-                                            padding=2), GLU(1), SwitchNorm2d(512),
+                                  nn.Conv2d(in_channels=75, out_channels=200, kernel_size=(5, 5), stride=2,
+                                            padding=2), GLU(1), SwitchNorm2d(100),
 
                                   )
-        self.eacnetD = nn.Sequential(*[ECABasicBlock(dim) for _ in range(6)])
+        self.eacnetD = nn.Sequential(*[ECABasicBlock(100) for _ in range(1)])
+        self.oooo=nn.Sequential(nn.Conv2d(in_channels=100, out_channels=2, kernel_size=(16, 16), stride=1,
+                                            padding=0), GLU(1),)
 
     def forward(self,img):
-        return self.eacnetD (self.cov1(img))
+        return  self.oooo(self.eacnetD (self.cov1(img)))
 
 
 class Gx(nn.Module):
@@ -260,7 +262,7 @@ class GAN_PFORT_DECODE(pt.LightningModule):
 
     def configure_optimizers(self):
         optimizerG = torch.optim.AdamW(self.GG.parameters(), lr=0.0001)
-        optimizerD = torch.optim.AdamW(self.GG.parameters(), lr=0.0001)
+        optimizerD = torch.optim.AdamW(self.dd.parameters(), lr=0.0001)
         ltG = {
             "scheduler": V3LSGDRLR(optimizerG,),  # 调度器
             "interval": 'step',  # 调度的单位，epoch或step
@@ -291,8 +293,8 @@ class GAN_PFORT_DECODE(pt.LightningModule):
 ##############################################
         # loss_img = nn.L1Loss()(t_img, img)
         # img = self.forward(img_f1, img_f2)
-
-        real_output = self.Dx(t_img)
+        t_img.requires_grad_(True)
+        real_output = self.dd(t_img)
         errD_real = torch.mean(torch.flatten(real_output))
         D_x = torch.flatten(real_output).mean().item()
 
@@ -300,13 +302,13 @@ class GAN_PFORT_DECODE(pt.LightningModule):
         fake_images = self.forward(img_f1, img_f2)
 
         # Train with fake
-        fake_output = self.Dx(fake_images)
+        fake_output = self.dd(fake_images)
         errD_fake = -torch.mean(torch.flatten(fake_output))
         D_G_z1 = torch.flatten(fake_output).mean().item()
 
         # Calculate W-div gradient penalty
         gradient_penalty = calculate_gradient_penalty(t_img, fake_images,
-                                                      real_output, fake_output, 2, 6,
+                                                      torch.flatten(real_output), torch.flatten(fake_output), 2, 6,
                                                       img_f1.device)
 
         # Add the gradients from the all-real and all-fake batches
@@ -316,7 +318,7 @@ class GAN_PFORT_DECODE(pt.LightningModule):
         # self.optimizer_d.step()
 ###############################       ###################################
         opt_d.zero_grad()
-        self.manual_backward(errDloss)
+        self.manual_backward(errDloss,retain_graph=True)
         opt_d.step()
 ###############################################################
 
@@ -325,19 +327,27 @@ class GAN_PFORT_DECODE(pt.LightningModule):
         ##############################################
         # self.generator.zero_grad()
         # Generate fake image batch with G
-        fake_images = self.forward(img_f1, img_f2)
-        fake_output = self.Dx(fake_images)
-        errG = torch.mean(torch.flatten(fake_output))
-        D_G_z2 = torch.flatten(fake_output).mean().item()
+        # fake_images = self.forward(img_f1, img_f2)
+        fake_output11 = self.dd(fake_images)
+        errG = torch.mean(torch.flatten(fake_output11))
+        D_G_z2 = torch.flatten(fake_output11).mean().item()
         loss_img = nn.L1Loss()(t_img, fake_images)
 
+
+        # if self.global_step>500:
+        #     losssss = (errG + loss_img)
+        # else:
+        #     losssss = ( loss_img)
+        losssss = ((errG + loss_img*100))/101
         opt_g.zero_grad()
-        self.manual_backward((errG+loss_img))
+        self.manual_backward(losssss)
         opt_g.step()
+        sch_g.step()
+        sch_d.step()
 
 
-        if batch_idx%50==0:
-            self.wwww(batch_idx,loss_img, t_img, img1,img2,fake_images,D_G_z2,D_G_z1,D_x)
+        if batch_idx%10==0 or batch_idx%11==0:
+            self.wwww(batch_idx,loss_img, t_img, img1,img2,fake_images,D_G_z2,D_G_z1,D_x,gradient_penalty)
 
 
         # return loss_img
@@ -346,7 +356,7 @@ class GAN_PFORT_DECODE(pt.LightningModule):
         # print(optimizer.state_dict()['param_groups'][0]['lr'],self.global_step)
         self.lrc = optimizer.state_dict()['param_groups'][0]['lr']
 
-    def wwww(self,batch_idx,loss1, t_img, img1,img2,oimg,D_G_z2,D_G_z1,D_x):
+    def wwww(self,batch_idx,loss1, t_img, img1,img2,oimg,D_G_z2,D_G_z1,D_x,gradient_penalty):
 
 
         step=self.global_step
@@ -358,12 +368,12 @@ class GAN_PFORT_DECODE(pt.LightningModule):
         writer.add_scalar('GANtrain/D_xTrue', D_x, step)
         writer.add_scalar('GANtrain/D_xfack', D_G_z1, step)
         writer.add_scalar('GANtrain/G_ganx', D_G_z2, step)
-
+        writer.add_scalar('GANtrain/d_gradient_penalty', gradient_penalty, step)
         writer.add_scalar('train/loss1', loss1, step)
         # writer.add_scalar('train/loss2', loss2, step)
         writer.add_scalar('train/grad_norm', self.grad_norm, step)
         writer.add_scalar('train/lr', self.lrc, step)
-        if batch_idx % 200 == 0:
+        if batch_idx % 100 == 0 or batch_idx%101==0:
             writer.add_images('train_img/out',oimg.float(), step)
             writer.add_images('train_img/GTimg', t_img.float(), step)
             writer.add_images('train_img/INimg1', img1.float(), step)
@@ -381,7 +391,7 @@ class GAN_PFORT_DECODE(pt.LightningModule):
 
 if __name__=='__main__':
     writer = SummaryWriter("./st2_log/", )
-    modss=PFORT_DECODE(dim=512,eaclay=4)
+    modss=GAN_PFORT_DECODE(dim=512,eaclay=5)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = st2_dataset('V2_dataset_stage2.hdf5','st2_rcmap','st2_map','./i/','img_maps')
     from pytorch_lightning import loggers as pl_loggers
@@ -396,7 +406,7 @@ if __name__=='__main__':
         filename='Ve1-epoch{epoch:02d}-{epoch}-{step}',
 
         auto_insert_metric_name=False#, every_n_epochs=20
-        , save_top_k=-1,every_n_train_steps=30000
+        , save_top_k=-1,every_n_train_steps=20000
 
     )
 

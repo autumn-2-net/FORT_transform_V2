@@ -1,7 +1,7 @@
 import torch
 
 
-def calculate_gradient_penalty(real_data, fake_data, real_outputs, fake_outputs, k=2, p=6, device=torch.device("cpu")):
+def calculate_gradient_penalty(real_data, fake_data, real_outputs, fake_outputs, k=2, p=6, device=torch.device("cuda")):
     real_grad_outputs = torch.full((real_data.size(0),), 1, dtype=torch.float32, requires_grad=False, device=device)
     fake_grad_outputs = torch.full((fake_data.size(0),), 1, dtype=torch.float32, requires_grad=False, device=device)
 
@@ -11,7 +11,7 @@ def calculate_gradient_penalty(real_data, fake_data, real_outputs, fake_outputs,
         grad_outputs=real_grad_outputs,
         create_graph=True,
         retain_graph=True,
-        only_inputs=True,
+        only_inputs=True, allow_unused=True
     )[0]
     fake_gradient = torch.autograd.grad(
         outputs=fake_outputs,
@@ -19,7 +19,7 @@ def calculate_gradient_penalty(real_data, fake_data, real_outputs, fake_outputs,
         grad_outputs=fake_grad_outputs,
         create_graph=True,
         retain_graph=True,
-        only_inputs=True,
+        only_inputs=True, allow_unused=True
     )[0]
 
     real_gradient_norm = real_gradient.view(real_gradient.size(0), -1).pow(2).sum(1) ** (p / 2)
