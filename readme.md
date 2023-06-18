@@ -11,4 +11,8 @@ w _path 放你的 字笔画映射文件  我仓库里面提供了阳光实验可
 如何运行他等待png生成
 
 
+
+aaa = dastset('映射.json', 'fix1.json', './i')  这里该你数据集  fix1.json就是你的 字笔画映射文件
+./i 是你的png文件路径
+映射就别乱动了 除非你自己有更好的映射方案
 运行[Tencode.py](Tencode.py)  就可以 训练了
