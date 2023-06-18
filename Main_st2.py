@@ -1,6 +1,7 @@
 import os
 
 from base_modle.att_modle import self_attention
+from base_modle.att_modle_pre import post_Pself_attention
 
 os.environ["TORCH_CUDNN_V8_API_ENABLED"] = "1"
 
@@ -518,7 +519,7 @@ class LTPFORT_DECODE(pt.LightningModule):
         super().__init__()
         self.eacnet=nn.Sequential(*[ECABasicBlock(dim*2) for _ in range(eaclay)])
         # self.eacnet2 = nn.Sequential(*[ECABasicBlock(dim) for _ in range(eaclay)])
-        self.sfa_bh = self_attention(5, 512, 8, 512, mlpdropout=0.1, attdropout=0.1 )
+        self.sfa_bh = post_Pself_attention(9, 512, 8, 512, mlpdropout=0.1, attdropout=0.1 )
 
         # self.eacnet = Gres_modle(eaclay,dim)
         # self.eacnet = res_modle(eaclay, dim)
@@ -554,7 +555,7 @@ class LTPFORT_DECODE(pt.LightningModule):
         cimg=torch.cat([img_feature1,img_feature2],1)
 
 
-        cimg=self.eacnet(cimg)
+        # cimg=self.eacnet(cimg)
         # img_feature2 = self.eacnet(img_feature2)
         # ax3 = img_feature1.detach().cpu().numpy()
         # ax4 = img_feature2.detach().cpu().numpy()
@@ -596,6 +597,7 @@ class LTPFORT_DECODE(pt.LightningModule):
 
         # loss_img=nn.SmoothL1Loss()(img_tensor,img)
         loss_img = nn.L1Loss()(t_img, img)
+        # loss_img = nn.MSELoss()(t_img, img)
 
 
         # bhloss=0
@@ -640,8 +642,8 @@ class LTPFORT_DECODE(pt.LightningModule):
 
 
 if __name__=='__main__':
-    writer = SummaryWriter("./st2_logs/", )
-    modss=LTPFORT_DECODE(dim=512,eaclay=5)
+    writer = SummaryWriter("./st2_logss/", )
+    modss=LTPFORT_DECODE(dim=512,eaclay=4)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = st2_dataset('V2_dataset_stage2.hdf5','st2_rcmap','st2_map','./i/','img_maps')
     from pytorch_lightning import loggers as pl_loggers
@@ -659,6 +661,7 @@ if __name__=='__main__':
         , save_top_k=-1,every_n_train_steps=20000
 
     )
+    modss=modss.load_from_checkpoint('./std_ckpt/Ve2-epoch01-1-120000.ckpt',dim=512,eaclay=4)
 
     trainer = Trainer(accelerator='gpu',logger=tensorboard,max_epochs=400,callbacks=[checkpoint_callback],precision='bf16'
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
