@@ -448,7 +448,7 @@ if __name__=='__main__':
                       #, ckpt_path=r'C:\Users\autumn\Desktop\poject_all\Font_DL\lightning_logs\version_41\checkpoints\epoch=34-step=70000.ckpt'
                       )
     # trainer.save_checkpoint('test.pyt')
-    modss=modss.load_from_checkpoint('./post_LN/V5-epoch09-9-360000.ckpt',ATTlays=6,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
+    # modss=modss.load_from_checkpoint('./post_LN/V5-epoch09-9-360000.ckpt',ATTlays=6,bhlay=9,imglay=5,dim=512,heads=8,inner_dim=512,out_dim=48,pos_emb_drop=0.1,mlpdropout=0.05,attdropout=0.05)
     trainer.fit(model=modss,train_dataloaders=DataLoader(dataset=aaaa,batch_size=8,shuffle=True
                                                    ,num_workers=4,prefetch_factor =16,pin_memory=True,
                                                    ))
