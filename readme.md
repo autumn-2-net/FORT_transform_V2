@@ -18,6 +18,6 @@ aaa = dastset('映射.json', 'fix1.json', './i')  这里该你数据集  fix1.js
 运行[Tencode.py](Tencode.py)  就可以 训练了
 
 要训练第二阶段的模型 你需要先训练好第一阶段
-[encode_test.py](encode_test.py) 并且用中国文件提取特征
+[encode_test.py](encode_test.py) 并且用这个文件提取特征
 
 [Main_st2.py](Main_st2.py) 如何这个文件训练
