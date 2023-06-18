@@ -513,11 +513,135 @@ class TPFORT_DECODE(pt.LightningModule):
         writer.flush()
 
 
+class LTPFORT_DECODE(pt.LightningModule):
+    def __init__(self, dim, eaclay):
+        super().__init__()
+        self.eacnet=nn.Sequential(*[ECABasicBlock(dim*2) for _ in range(eaclay)])
+        # self.eacnet2 = nn.Sequential(*[ECABasicBlock(dim) for _ in range(eaclay)])
+        self.sfa_bh = self_attention(5, 512, 8, 512, mlpdropout=0.1, attdropout=0.1 )
+
+        # self.eacnet = Gres_modle(eaclay,dim)
+        # self.eacnet = res_modle(eaclay, dim)
+        self.decode = nn.Sequential(
+            nn.ConvTranspose2d(in_channels=dim*2, out_channels=666, kernel_size=(5, 5), stride=2,
+                               padding=1), GLU(1), SwitchNorm2d(333),
+            nn.ConvTranspose2d(in_channels=333, out_channels=400, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(200),
+            nn.ConvTranspose2d(in_channels=200, out_channels=300, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(150),
+            nn.ConvTranspose2d(in_channels=150, out_channels=200, kernel_size=(5, 5), stride=2,
+                               padding=2), GLU(1), SwitchNorm2d(100),
+            nn.ConvTranspose2d(in_channels=100, out_channels=3, kernel_size=(6, 6), stride=2,
+                               padding=3),
+            nn.Softplus()
+            # nn.Softmax(),
+        )
+
+        self.grad_norm = 0
+        self.lrc = 0.0001
+        self.emx = EMBDim(512,drop=0.1)
+
+    def forward(self,img_feature1,img_feature2):
+        # ax5 = img_feature1.detach().cpu().numpy()
+        # ax6 = img_feature2.detach().cpu().numpy()
+        img_feature1=self.emx(rearrange((img_feature1), 'b c h w -> b (h w) c'),0)
+        img_feature2 = self.emx(rearrange((img_feature2), 'b c h w -> b (h w) c'),1)
+        fuxemf=torch.cat([img_feature1,img_feature2],1)
+        fff=self.sfa_bh(fuxemf)
+        img_feature1, img_feature2 = fff.chunk(2, dim=1)
+        img_feature1=rearrange(img_feature1, 'b (h w) c -> b c h w',h=8)
+        img_feature2 = rearrange(img_feature2, 'b (h w) c -> b c h w', h=8)
+        cimg=torch.cat([img_feature1,img_feature2],1)
+
+
+        cimg=self.eacnet(cimg)
+        # img_feature2 = self.eacnet(img_feature2)
+        # ax3 = img_feature1.detach().cpu().numpy()
+        # ax4 = img_feature2.detach().cpu().numpy()
+
+        # img_feature1, _= img_feature1.chunk(2, dim=1)
+        # _, img_feature2 = img_feature2.chunk(2, dim=1)
+        #
+        # feature=torch.cat((img_feature1,img_feature2),dim=1)
+        img=self.decode(cimg)
+        # cp1=img[1]
+        # cp2 = img[0]
+        # cpp=img.detach().cpu().numpy()
+        # ax1=img_feature1.detach().cpu().numpy()
+        # ax2=img_feature2.detach().cpu().numpy()
+        pass
+
+        return img
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(self.parameters(), lr=0.0001)
+        lt = {
+            "scheduler": V3LSGDRLR(optimizer,),  # 调度器
+            "interval": 'step',  # 调度的单位，epoch或step
+
+            "reduce_on_plateau": False,  # ReduceLROnPlateau
+            "monitor": "val_loss",  # ReduceLROnPlateau的监控指标
+            "strict": False  # 如果没有monitor，是否中断训练
+        }
+
+        return {"optimizer": optimizer,
+                "lr_scheduler": lt
+                }
+
+
+    def training_step(self, batch, batch_idx):
+        img_f1, img_f2, t_img, img1,img2=batch
+
+        img=self.forward(img_f1,img_f2)
+
+        # loss_img=nn.SmoothL1Loss()(img_tensor,img)
+        loss_img = nn.L1Loss()(t_img, img)
+
+
+        # bhloss=0
+
+        if batch_idx%50==0:
+            self.wwww(batch_idx,loss_img, t_img, img1,img2,img)
+
+
+        return loss_img
+    # def on_after_backward(self):
+    #     self.grad_norm = nn.utils.clip_grad_norm_(self.parameters(),  1e9)
+    def on_before_zero_grad(self, optimizer):
+        # print(optimizer.state_dict()['param_groups'][0]['lr'],self.global_step)
+        self.lrc = optimizer.state_dict()['param_groups'][0]['lr']
+
+    def wwww(self,batch_idx,loss1, t_img, img1,img2,oimg):
+
+
+        step=self.global_step
+        # writer = tensorboard.SummaryWriter
+
+        # writer = tensorboard
+        # writer.add_audio('feature/audio', features['audio'][0], step, sample_rate=self.params.sample_rate)
+
+
+        writer.add_scalar('train/loss1', loss1, step)
+        # writer.add_scalar('train/loss2', loss2, step)
+        writer.add_scalar('train/grad_norm', self.grad_norm, step)
+        writer.add_scalar('train/lr', self.lrc, step)
+        if batch_idx % 200 == 0:
+            writer.add_images('train_img/out',oimg.float(), step)
+            writer.add_images('train_img/GTimg', t_img.float(), step)
+            writer.add_images('train_img/INimg1', img1.float(), step)
+            writer.add_images('train_img/INimg2', img2.float(), step)
+        # if batch_idx % 100 == 0:
+        #     GT,pre,mask = self.mcpx(bh,tocken,masktocken)
+        #     writer.add_figure('M/GT', GT, step)
+        #     writer.add_figure('M/pre', pre, step)
+        #     writer.add_figure('M/mask', mask, step)
+        writer.flush()
+
 
 
 if __name__=='__main__':
-    writer = SummaryWriter("./st2_log/", )
-    modss=TPFORT_DECODE(dim=512,eaclay=5)
+    writer = SummaryWriter("./st2_logs/", )
+    modss=LTPFORT_DECODE(dim=512,eaclay=5)
     # aaaa = dastset('映射.json', 'fix1.json', './i')
     aaaa = st2_dataset('V2_dataset_stage2.hdf5','st2_rcmap','st2_map','./i/','img_maps')
     from pytorch_lightning import loggers as pl_loggers
@@ -529,7 +653,7 @@ if __name__=='__main__':
 
         dirpath='./std_ckpt',
 
-        filename='Ve1-epoch{epoch:02d}-{epoch}-{step}',
+        filename='Ve2-epoch{epoch:02d}-{epoch}-{step}',
 
         auto_insert_metric_name=False#, every_n_epochs=20
         , save_top_k=-1,every_n_train_steps=20000
