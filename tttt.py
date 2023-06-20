@@ -26,20 +26,24 @@ if __name__=='__main__':
     # for i in fff:
     #     i
     # pass
-    asfsd=nn.Sequential(
-        nn.ConvTranspose2d(in_channels=512, out_channels=600, kernel_size=(15, 15), stride=2,
-                           padding=0), GLU(1),
-        nn.ConvTranspose2d(in_channels=300, out_channels=512, kernel_size=(15, 15), stride=2,
-                           padding=0), GLU(1),
-        nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=(8, 8), stride=2,
-                           padding=1), GLU(1),
-        nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=(8, 8), stride=2,
-                           padding=2), GLU(1),
-        nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=(8, 8), stride=2,
-                           padding=1),
-        # nn.Sigmoid()
-        nn.ReLU(),
-    )
+    # asfsd=nn.Sequential(
+    #     nn.ConvTranspose2d(in_channels=512, out_channels=600, kernel_size=(15, 15), stride=2,
+    #                        padding=0), GLU(1),
+    #     nn.ConvTranspose2d(in_channels=300, out_channels=512, kernel_size=(15, 15), stride=2,
+    #                        padding=0), GLU(1),
+    #     nn.ConvTranspose2d(in_channels=256, out_channels=256, kernel_size=(8, 8), stride=2,
+    #                        padding=1), GLU(1),
+    #     nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=(8, 8), stride=2,
+    #                        padding=2), GLU(1),
+    #     nn.ConvTranspose2d(in_channels=64, out_channels=3, kernel_size=(8, 8), stride=2,
+    #                        padding=1),
+    #     # nn.Sigmoid()
+    #     nn.ReLU(),
+    # )
+
+    aaaaaa=torch.load('C:/Users/autumn/Downloads/新建文件夹 (19)/1model.ckpt')
+    aaaaaa1 = torch.load('C:/Users/autumn/Downloads/vgg.pth')
+    pass
 
 
 
