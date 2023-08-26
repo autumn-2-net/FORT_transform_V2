@@ -23,6 +23,6 @@ aaa = dastset('映射.json', 'fix1.json', './i')  这里该你数据集  fix1.js
 [Main_st2.py](Main_st2.py) 如何这个文件训练
 
 
-有点难炼开摆
+有点难炼开摆  只能说效果还行 但是算不下去了
 
 ![1.png](1.png)![2.png](2.png)![3.png](3.png)![4.png](4.png)
